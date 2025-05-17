@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -236,7 +236,7 @@ namespace Tasks
 
         public void PrintCOM(int hwCount, TextWriter writer)
         {
-            writer.Write($"CH{id} {cost} {bandwidth}");
+            writer.Write($"CHAN{id} {cost} {bandwidth}");
 
             foreach (var hw in Enumerable.Range(0, hwCount))
             {
@@ -753,9 +753,10 @@ namespace Tasks
 
                                     case 4:
                                         var ch = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (ch.Length >= 3 && ch[0].StartsWith("CH"))
+                                        if (ch.Length >= 3 && (ch[0].StartsWith("CHAN") || ch[0].StartsWith("CH0")))
                                         {
-                                            int chanNum = int.Parse(ch[0][2..]);
+                                            string chanLabel = ch[0].Replace("CH0", "CHAN0");
+                                            int chanNum = int.Parse(chanLabel[4..]); // "CHAN" has 4 characters
                                             int comCost = int.Parse(ch[1]);
                                             int bandwidth = int.Parse(ch[2]);
                                             var c = new COM(bandwidth, comCost, chanNum);
@@ -769,6 +770,7 @@ namespace Tasks
                                             channels.Add(c);
                                         }
                                         break;
+
 
                                     default:
                                         throw new Exception("Unexpected section or malformed file.");
