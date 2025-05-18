@@ -19,6 +19,9 @@
             <Button x:Name="GenerateButton" Content="Generate Random" Click="GenerateButton_Click" Margin="5" Width="100" ToolTip="Generate a random task graph with specified parameters."/>
             <Button x:Name="RunButton" Content="Run Simulation" Click="RunButton_Click" Margin="5" Width="100" ToolTip="Run the task scheduling simulation."/>
             <Button x:Name="SaveButton" Content="Save to File" Click="SaveButton_Click" Margin="5" Width="100" ToolTip="Save the current task graph to a file."/>
+            <Button x:Name="AssignFastestButton" Content="Assign Fastest" Click="AssignFastestButton_Click" Margin="5" Width="100" ToolTip="Assign all tasks to the fastest hardware."/>
+            <Button x:Name="AssignCheapestButton" Content="Assign Cheapest" Click="AssignCheapestButton_Click" Margin="5" Width="100" ToolTip="Assign all tasks to the cheapest hardware."/>
+            <Button x:Name="ShowAssignmentsButton" Content="Show Assignments" Click="ShowAssignmentsButton_Click" Margin="5" Width="100" ToolTip="Display which hardware executes which tasks."/>
             <WrapPanel Orientation="Horizontal" Margin="5">
                 <StackPanel Orientation="Horizontal" Margin="5">
                     <TextBlock Text="Tasks:" VerticalAlignment="Center" Margin="0,0,5,0" ToolTip="Number of tasks (1-100)"/>

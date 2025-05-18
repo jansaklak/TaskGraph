@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -8,6 +8,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Timers;
 
 
 namespace Tasks
@@ -168,6 +169,8 @@ namespace Tasks
         HC = 1, // Hardware Core
         PE = 2  // Processing Element
     }
+
+
 
     public class Hardware : IComparable<Hardware>
     {
@@ -510,6 +513,11 @@ namespace Tasks
 
         public Times GetTimes() => times;
 
+        public List<Instance> GetInstances()
+        {
+            return instances;
+        }
+
         public CostList()
         {
             times = new Times();
@@ -541,6 +549,163 @@ namespace Tasks
             channelsAmount = coms;
             withCost = 1;
         }
+
+
+        public void AssignEachToFastestHardware()
+        {
+            if (taskGraph == null || hardwares == null || hardwares.Count == 0)
+            {
+                Console.Error.WriteLine("Invalid task graph or hardware list.");
+                return;
+            }
+
+            // Clear existing instances and mappings
+            instances.Clear();
+            taskInstanceMap.Clear();
+            hwInstancesCount.Clear();
+            taskSchedule.Clear();
+
+            // Dictionary to track instances per hardware
+            Dictionary<Hardware, Instance> hardwareInstances = new Dictionary<Hardware, Instance>();
+            int estimatedCost = 0;
+            int estimatedTime = 0;
+            int numAllocated = 0;
+
+            // Assign each task to the hardware with the lowest execution time
+            for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
+            {
+                Hardware fastestHw = null;
+                int minTime = int.MaxValue;
+
+                // Find the fastest hardware for this task
+                foreach (var hw in hardwares)
+                {
+                    var allTaskTimes = times.GetTimes(i, hw) ?? new List<int>();
+                    int taskTime = allTaskTimes.Count > 1 ? allTaskTimes.Max() : allTaskTimes.FirstOrDefault();
+                    if (taskTime < minTime)
+                    {
+                        minTime = taskTime;
+                        fastestHw = hw;
+                    }
+                }
+
+                if (fastestHw == null)
+                {
+                    Console.Error.WriteLine($"No suitable hardware found for task {i}.");
+                    continue;
+                }
+
+                // Get or create an instance for this hardware
+                if (!hardwareInstances.TryGetValue(fastestHw, out var inst))
+                {
+                    int instId = hwInstancesCount.ContainsKey(fastestHw.GetID()) ? hwInstancesCount[fastestHw.GetID()] : 0;
+                    inst = new Instance(instId, fastestHw);
+                    instances.Add(inst);
+                    hardwareInstances[fastestHw] = inst;
+                    hwInstancesCount[fastestHw.GetID()] = instId + 1;
+                }
+
+                // Assign task to the instance
+                var taskTimes = times.GetTimes(i, fastestHw) ?? new List<int>();
+                var taskCosts = times.GetCosts(i, fastestHw) ?? new List<int>();
+
+                if (taskTimes.Count > 1) // Subtasks
+                {
+                    estimatedTime += taskTimes.Max();
+                    estimatedCost += taskCosts.Sum();
+                }
+                else // Single task
+                {
+                    estimatedTime += taskTimes.FirstOrDefault();
+                    estimatedCost += taskCosts.FirstOrDefault();
+                }
+
+                inst.AddTask(i);
+                taskInstanceMap[i] = inst;
+                numAllocated++;
+            }
+
+            totalCost = estimatedCost;
+            Console.WriteLine($"Assigned {numAllocated} tasks to their fastest hardware. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
+        }
+
+        public void AssignToCheapestHardware()
+        {
+            if (taskGraph == null || hardwares == null || hardwares.Count == 0)
+            {
+                Console.Error.WriteLine("Invalid task graph or hardware list.");
+                return;
+            }
+
+            // Clear existing instances and mappings
+            instances.Clear();
+            taskInstanceMap.Clear();
+            hwInstancesCount.Clear();
+            taskSchedule.Clear();
+
+            // Find the hardware with the lowest total cost
+            Hardware cheapestHw = null;
+            int minTotalCost = int.MaxValue;
+
+            foreach (var hw in hardwares)
+            {
+                int totalCost = 0;
+                for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
+                {
+                    var taskCosts = times.GetCosts(i, hw) ?? new List<int>();
+                    totalCost += taskCosts.Count > 1 ? taskCosts.Sum() : taskCosts.FirstOrDefault();
+                }
+                if (totalCost < minTotalCost)
+                {
+                    minTotalCost = totalCost;
+                    cheapestHw = hw;
+                }
+            }
+
+            if (cheapestHw == null)
+            {
+                Console.Error.WriteLine("No suitable hardware found.");
+                return;
+            }
+
+            // Assign all tasks to the cheapest hardware
+            int estimatedCost = 0;
+            int estimatedTime = 0;
+            int numAllocated = 0;
+
+            // Create a single instance for the cheapest hardware
+            int instId = hwInstancesCount.ContainsKey(cheapestHw.GetID()) ? hwInstancesCount[cheapestHw.GetID()] : 0;
+            var inst = new Instance(instId, cheapestHw);
+            instances.Add(inst);
+            hwInstancesCount[cheapestHw.GetID()] = instId + 1;
+
+            for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
+            {
+                var taskTimes = times.GetTimes(i, cheapestHw) ?? new List<int>();
+                var taskCosts = times.GetCosts(i, cheapestHw) ?? new List<int>();
+
+                if (taskTimes.Count > 1) // Subtasks
+                {
+                    estimatedTime += taskTimes.Max();
+                    estimatedCost += taskCosts.Sum();
+                }
+                else // Single task
+                {
+                    estimatedTime += taskTimes.FirstOrDefault();
+                    estimatedCost += taskCosts.FirstOrDefault();
+                }
+
+                inst.AddTask(i);
+                taskInstanceMap[i] = inst;
+                numAllocated++;
+            }
+
+            totalCost = estimatedCost;
+            Console.WriteLine($"Assigned {numAllocated} tasks to {cheapestHw}. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
+        }
+
+
+
 
         private void CountTimer(ref bool stop, ref int time)
         {

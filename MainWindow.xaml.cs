@@ -1,17 +1,14 @@
 ﻿using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Threading.Channels;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
-using Tasks; // Namespace from provided code
+using Tasks;
 
 namespace TaskGraphWPF
 {
@@ -19,7 +16,7 @@ namespace TaskGraphWPF
     {
         private CostList costList;
         private readonly Random rand = new Random();
-        private Dictionary<int, Point> nodePositions; // Cache node positions
+        private Dictionary<int, Point> nodePositions;
 
         public MainWindow()
         {
@@ -35,6 +32,9 @@ namespace TaskGraphWPF
             GenerateButton.ToolTip = "Generate a random task graph.";
             RunButton.ToolTip = "Run the task scheduling simulation.";
             SaveButton.ToolTip = "Save the current task graph to a file.";
+            AssignFastestButton.ToolTip = "Assign each task to the hardware that executes it the fastest.";
+            AssignCheapestButton.ToolTip = "Assign all tasks to the cheapest hardware.";
+            ShowAssignmentsButton.ToolTip = "Display which hardware executes which tasks.";
         }
 
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
@@ -72,7 +72,6 @@ namespace TaskGraphWPF
         {
             try
             {
-                // Parse input values with validation
                 if (!int.TryParse(TasksTextBox.Text, out int tasks) || tasks < 1 || tasks > 100)
                 {
                     MessageBox.Show("Invalid number of tasks. Enter a number between 1 and 100.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
@@ -104,11 +103,8 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                // Create new CostList with properly initialized hardware and tasks
                 costList = new CostList(tasks, hcs, pus, coms, maxTasks);
                 costList.RandALL();
-                // Set random edges in the task graph
-
 
                 await UpdateUIAsync();
                 MessageBox.Show("Random task graph generated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -123,7 +119,6 @@ namespace TaskGraphWPF
         {
             try
             {
-                // Validate that we have a valid graph to run
                 if (costList.GetGraph() == null || costList.GetGraph().GetVerticesSize() == 0)
                 {
                     MessageBox.Show("No task graph available. Please generate or load a graph first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -136,10 +131,9 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                // Run simulation in background to keep UI responsive
                 await Task.Run(() =>
                 {
-                    costList.taskDistribution(0); // Rule 0: minimize time
+                    costList.taskDistribution(0);
                     costList.RunTasks();
                 });
                 await UpdateUIAsync();
@@ -151,9 +145,97 @@ namespace TaskGraphWPF
             }
         }
 
+        private async void AssignFastestButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (costList.GetGraph() == null || costList.GetGraph().GetVerticesSize() == 0)
+                {
+                    MessageBox.Show("No task graph available. Please generate or load a graph first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                {
+                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                await Task.Run(() =>
+                {
+                    costList.AssignEachToFastestHardware();
+                });
+                await UpdateUIAsync();
+                MessageBox.Show("Each task assigned to its fastest hardware.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error assigning tasks: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private async void AssignCheapestButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (costList.GetGraph() == null || costList.GetGraph().GetVerticesSize() == 0)
+                {
+                    MessageBox.Show("No task graph available. Please generate or load a graph first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                {
+                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                await Task.Run(() =>
+                {
+                    costList.AssignToCheapestHardware();
+                });
+                await UpdateUIAsync();
+                MessageBox.Show("All tasks assigned to the cheapest hardware.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error assigning tasks: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void ShowAssignmentsButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (costList.GetGraph() == null || costList.GetGraph().GetVerticesSize() == 0)
+                {
+                    MessageBox.Show("No task graph available. Please generate or load a graph first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                {
+                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                if (costList.GetInstance(0) == null)
+                {
+                    MessageBox.Show("No tasks assigned. Please run simulation or assign tasks first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                var assignmentWindow = new TaskAssignmentWindow(costList);
+                assignmentWindow.Show();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Error showing assignments: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
         private void SaveButton_Click(object sender, RoutedEventArgs e)
         {
-            // Validate that we have something to save
             if (costList.GetGraph() == null || costList.GetGraph().GetVerticesSize() == 0)
             {
                 MessageBox.Show("No task graph available to save. Please generate or load a graph first.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -225,20 +307,17 @@ namespace TaskGraphWPF
             int vertexCount = graph.GetVerticesSize();
             nodePositions.Clear();
 
-            // Simple circular layout to avoid overlaps
             double centerX = GraphCanvas.ActualWidth / 2;
             double centerY = GraphCanvas.ActualHeight / 2;
             double radius = Math.Min(GraphCanvas.ActualWidth, GraphCanvas.ActualHeight) / 3;
 
             for (int i = 0; i < vertexCount; i++)
             {
-                // Calculate position using circular layout
                 double angle = 2 * Math.PI * i / vertexCount;
                 double x = centerX + radius * Math.Cos(angle);
                 double y = centerY + radius * Math.Sin(angle);
                 nodePositions[i] = new Point(x, y);
 
-                // Get hardware for time information - safely handle cases with no hardware
                 var hardware = costList.GetHardwares().FirstOrDefault();
                 bool hasSubtasks = hardware != null &&
                     costList.GetTimes().GetTimes(i, hardware)?.Count > 1;
@@ -256,8 +335,8 @@ namespace TaskGraphWPF
                     : $"T{i} (Time: {times.FirstOrDefault()}, Cost: {costs.FirstOrDefault()})";
 
                 var node = CreateNode(x, y, hasSubtasks, tooltip);
-                GraphCanvas.Children.Add(node.Item1); // Ellipse
-                GraphCanvas.Children.Add(node.Item2); // Label
+                GraphCanvas.Children.Add(node.Item1);
+                GraphCanvas.Children.Add(node.Item2);
             }
 
             foreach (var edgeList in graph.GetAdjList())
@@ -271,8 +350,8 @@ namespace TaskGraphWPF
                         Point start = nodePositions[v1];
                         Point end = nodePositions[v2];
                         var line = CreateEdge(start, end, edge.GetWeight());
-                        GraphCanvas.Children.Add(line.Item1); // Line
-                        GraphCanvas.Children.Add(line.Item2); // Weight label
+                        GraphCanvas.Children.Add(line.Item1);
+                        GraphCanvas.Children.Add(line.Item2);
                     }
                 }
             }
