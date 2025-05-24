@@ -174,13 +174,13 @@ namespace Tasks
 
     public class Hardware : IComparable<Hardware>
     {
-        private int cost;
+        private int cost = 0;
         private HardwareType type;
         private int id;
 
         public Hardware(int cost, HardwareType type, int id)
         {
-            this.cost = cost;
+            this.cost = 0;
             this.type = type;
             this.id = id;
         }
@@ -454,7 +454,6 @@ namespace Tasks
         private int tasksAmount;
         private int hardwareCoresAmount;
         private int processingUnitAmount;
-        private int channelsAmount;
         private int withCost;
 
         public Times GetTimes() => times;
@@ -490,7 +489,6 @@ namespace Tasks
             totalCost = 0;
             hardwareCoresAmount = hcs;
             processingUnitAmount = pes;
-            channelsAmount = coms;
             withCost = 1;
         }
 
