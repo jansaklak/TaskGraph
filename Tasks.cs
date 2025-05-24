@@ -410,12 +410,12 @@ namespace Tasks
         private List<Hardware> hardwares = new List<Hardware>();
         public Times times = new Times();
         private Graf taskGraph = new Graf();
-        private Dictionary<int, int> hwInstancesCount = new Dictionary<int, int>();
+        private Dictionary<int, int> hwInstancesCount = new Dictionary<int, int>(); 
         private List<Instance> instances = new List<Instance>();
         private Dictionary<int, Instance> taskInstanceMap = new Dictionary<int, Instance>();
         private Dictionary<int, Tuple<int, int>> taskSchedule = new Dictionary<int, Tuple<int, int>>();
         private List<Hardware> hwToTasks = new List<Hardware>();
-        private List<int> progress = new List<int>();
+        private List<int> progress = new List<int>();//Do usuniecia - miało być do symulacji
         private int simulationTimeScale = 1;
         private int totalCost = 0;
         private const int INF = 2000000000;
@@ -620,7 +620,7 @@ namespace Tasks
 
 
 
-        private void CountTimer(ref bool stop, ref int time)
+        private void CountTimer(ref bool stop, ref int time) //Do usuniecia
         {
             var start = Stopwatch.StartNew();
             while (!stop)
@@ -750,7 +750,7 @@ namespace Tasks
             return result;
         }
 
-        public int LoadFromFile(string filename, out string errorMessage)
+        public int LoadFromFile(string filename, out string errorMessage) //Najważniejsze - do poprawy
         {
             errorMessage = "";
             int lineNumber = 0;
@@ -866,7 +866,7 @@ namespace Tasks
 
 
 
-        public void CreateRandomTasksGraph()
+        public void CreateRandomTasksGraph() //Może się przydać ale trzeba uprościć tak jak chcemy
         {
             if (tasksAmount <= 1)
             {
@@ -1127,7 +1127,7 @@ namespace Tasks
             return 1;
         }
 
-        public void RunTasks()
+        public void RunTasks() //Do usuniecia
         {
             int totalCost = 0;
             simulationTimeScale = 1;
@@ -1157,7 +1157,7 @@ namespace Tasks
             Console.WriteLine($"\n\nProgram execution time: {time} milliseconds. (scale x{simulationTimeScale})\n\n");
         }
 
-        public Hardware GetLowestTimeHardware(int taskId, int timeCost)
+        public Hardware GetLowestTimeHardware(int taskId, int timeCost) 
         {
             int minValue = INF;
             Hardware minHardware = null;
@@ -1208,7 +1208,7 @@ namespace Tasks
             taskInstanceMap.Remove(taskId);
         }
 
-        public void TaskRunner(Instance inst)
+        public void TaskRunner(Instance inst) //Do usuniecia
         {
             if (inst == null || inst.GetHardwarePtr() == null)
             {
@@ -1351,7 +1351,7 @@ namespace Tasks
             return null;
         }
 
-        public void taskDistribution(int rule)
+        public void taskDistribution(int rule) // narazie lepiej zostawić
         {
             if (taskGraph == null || hardwares == null || hardwares.Count == 0)
             {
