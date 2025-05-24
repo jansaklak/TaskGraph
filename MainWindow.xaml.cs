@@ -283,16 +283,6 @@ namespace TaskGraphWPF
             }
 
             COMListBox.Items.Clear();
-            var coms = costList.GetCOMS();
-            if (coms == null || !coms.Any())
-            {
-                COMListBox.Items.Add("No communication channels available.");
-                return;
-            }
-            foreach (var com in coms)
-            {
-                COMListBox.Items.Add($"CH{com.GetID()} (Bandwidth: {com.GetBandwidth()}, Cost: {com.GetCost()}, Connections: {com.GetSize()})");
-            }
         }
 
         private void UpdateGraph()
@@ -419,8 +409,6 @@ namespace TaskGraphWPF
                         costList.PrintProc(writer);
                         writer.WriteLine();
                         costList.GetTimes().Show(writer);
-                        writer.WriteLine();
-                        costList.PrintCOMS(writer);
                         writer.WriteLine();
                         costList.PrintInstances();
                         Dispatcher.Invoke(() => ScheduleTextBox.Text = writer.ToString());
