@@ -164,50 +164,27 @@ namespace Tasks
         }
     }
 
-    public enum HardwareType
-    {
-        HC = 1, // Hardware Core
-        PE = 2  // Processing Element
-    }
-
-
-
-    public class Hardware : IComparable<Hardware>
+    public class Hardware
     {
         private int cost = 0;
-        private HardwareType type;
         private int id;
 
-        public Hardware(int cost, HardwareType type, int id)
+        public Hardware(int id)
         {
             this.cost = 0;
-            this.type = type;
             this.id = id;
         }
 
         public int GetCost() => cost;
-        public HardwareType GetType() => type;
         public int GetID() => id;
 
         public void PrintHW(TextWriter writer)
         {
-            writer.Write($"{cost} {(int)type} {id}");
-        }
-
-        public int CompareTo(Hardware other)
-        {
-            if (type != other.type)
-                return type.CompareTo(other.type);
-            return id.CompareTo(other.id);
-        }
-
-        public override string ToString()
-        {
-            return $"{(type == HardwareType.HC ? "HC" : "PE")}{id}";
+            writer.Write($"{cost} {id}");
         }
     }
 
-    public class Instance : IComparable<Instance>
+    public class Instance
     {
         private int id;
         private Hardware hardware;
@@ -232,12 +209,6 @@ namespace Tasks
             taskSet.Remove(taskId);
         }
 
-        public int CompareTo(Instance other)
-        {
-            if (hardware.GetType() != other.hardware.GetType())
-                return hardware.GetType().CompareTo(other.hardware.GetType());
-            return id.CompareTo(other.id);
-        }
 
         public override string ToString()
         {
@@ -843,7 +814,7 @@ namespace Tasks
                                             hwCost = int.Parse(p[0]);
                                             hwType = int.Parse(p[1]);
                                             int hwId = int.Parse(p[2]);
-                                            var hw = new Hardware(hwCost, (HardwareType)hwType, hwIdCounter++);
+                                            var hw = new Hardware(hwIdCounter++);
                                             hardwares.Add(hw);
                                         }
                                         break;
@@ -1120,13 +1091,13 @@ namespace Tasks
 
             for (int i = 0; i < hardwareCoresAmount; i++)
             {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
+                hardwares.Add(new Hardware(hardwares.Count));
             }
 
             int hcSize = hardwareCoresAmount;
             for (int j = 0; j < processingUnitAmount; j++)
             {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
+                hardwares.Add(new Hardware(hardwares.Count - hcSize));
             }
 
             return 1;
@@ -1144,13 +1115,13 @@ namespace Tasks
 
             for (int i = 0; i < hcs; i++)
             {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
+                hardwares.Add(new Hardware(hardwares.Count));
             }
 
             int hcSize = hcs;
             for (int j = 0; j < pes; j++)
             {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
+                hardwares.Add(new Hardware(hardwares.Count - hcSize));
             }
 
             return 1;
