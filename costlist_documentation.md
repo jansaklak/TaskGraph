@@ -71,8 +71,8 @@ Reprezentuje konkretną instancję sprzętu z przypisanymi zadaniami.
 Przechowuje informacje o czasie i koszcie wykonania zadań na różnym sprzęcie.
 
 **Właściwości:**
-- `Times` - lista czasów wykonania (dla podzadań)
-- `Costs` - lista kosztów wykonania (dla podzadań)
+- `Times` - lista czasów wykonania
+- `Costs` - lista kosztów wykonania
 
 ### 7. Times - Macierz czasów i kosztów
 
@@ -136,7 +136,7 @@ void taskDistribution(int rule)
 - `rule = 0` - optymalizacja czasu
 - `rule = 1` - optymalizacja kosztu
 
-### Symulacja wykonania
+### Symulacja wykonania - NIE DZIAŁA
 
 ```csharp
 void RunTasks()
