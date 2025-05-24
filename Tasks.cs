@@ -415,15 +415,13 @@ namespace Tasks
         private Dictionary<int, Instance> taskInstanceMap = new Dictionary<int, Instance>();
         private Dictionary<int, Tuple<int, int>> taskSchedule = new Dictionary<int, Tuple<int, int>>();
         private List<Hardware> hwToTasks = new List<Hardware>();
-        private int simulationTimeScale = 1;
         private int totalCost = 0;
         private const int INF = 2000000000;
         private const int SCALE = 100;
         private static Random random = new Random();
 
+        private int jeepAmount;
         private int tasksAmount;
-        private int hardwareCoresAmount;
-        private int processingUnitAmount;
         private int withCost;
 
         public Times GetTimes() => times;
@@ -441,11 +439,12 @@ namespace Tasks
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
+
             totalCost = 0;
             tasksAmount = 0;
         }
 
-        public CostList(int tasks, int hcs, int pes, int coms, int maxTasks)
+        public CostList(int tasks, int jeeps, int maxTasks)
         {
             tasksAmount = tasks;
             times = new Times(tasks);
@@ -454,9 +453,8 @@ namespace Tasks
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
+            jeepAmount = jeeps;
             totalCost = 0;
-            hardwareCoresAmount = hcs;
-            processingUnitAmount = pes;
             withCost = 1;
         }
 
@@ -1030,7 +1028,7 @@ namespace Tasks
         {
             times = new Times(tasksAmount); // Initialize the field
             CreateRandomTasksGraph();
-            GetRandomProc(hardwareCoresAmount, processingUnitAmount);
+            GetRandomProc();
             times.LoadHW(hardwares);
             times.SetRandomTimesAndCosts();
         }
@@ -1065,51 +1063,16 @@ namespace Tasks
 
         public int GetRandomProc()
         {
-            hardwares.Clear();
 
-            if (hardwareCoresAmount < 1 || processingUnitAmount < 1)
-            {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hardwareCoresAmount; i++)
+            for (int i = 0; i < jeepAmount; i++)
             {
                 hardwares.Add(new Hardware(hardwares.Count));
-            }
-
-            int hcSize = hardwareCoresAmount;
-            for (int j = 0; j < processingUnitAmount; j++)
-            {
-                hardwares.Add(new Hardware(hardwares.Count - hcSize));
             }
 
             return 1;
         }
 
-        public int GetRandomProc(int hcs, int pes)
-        {
-            hardwares.Clear();
 
-            if (hcs < 1 || pes < 1)
-            {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hcs; i++)
-            {
-                hardwares.Add(new Hardware(hardwares.Count));
-            }
-
-            int hcSize = hcs;
-            for (int j = 0; j < pes; j++)
-            {
-                hardwares.Add(new Hardware(hardwares.Count - hcSize));
-            }
-
-            return 1;
-        }
 
         public Hardware GetLowestTimeHardware(int taskId, int timeCost) 
         {
