@@ -415,7 +415,6 @@ namespace Tasks
         private Dictionary<int, Instance> taskInstanceMap = new Dictionary<int, Instance>();
         private Dictionary<int, Tuple<int, int>> taskSchedule = new Dictionary<int, Tuple<int, int>>();
         private List<Hardware> hwToTasks = new List<Hardware>();
-        private List<int> progress = new List<int>();//Do usuniecia - miało być do symulacji
         private int simulationTimeScale = 1;
         private int totalCost = 0;
         private const int INF = 2000000000;
@@ -442,7 +441,6 @@ namespace Tasks
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>();
             totalCost = 0;
             tasksAmount = 0;
         }
@@ -456,7 +454,6 @@ namespace Tasks
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>(new int[tasks]);
             totalCost = 0;
             hardwareCoresAmount = hcs;
             processingUnitAmount = pes;
@@ -615,19 +612,6 @@ namespace Tasks
 
             totalCost = estimatedCost;
             Console.WriteLine($"Assigned {numAllocated} tasks to {cheapestHw}. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
-        }
-
-
-
-
-        private void CountTimer(ref bool stop, ref int time) //Do usuniecia
-        {
-            var start = Stopwatch.StartNew();
-            while (!stop)
-            {
-                time = (int)start.ElapsedMilliseconds;
-                Thread.Sleep(1);
-            }
         }
 
         public int GetInstanceStartingTime(Instance inst)
@@ -1127,36 +1111,6 @@ namespace Tasks
             return 1;
         }
 
-        public void RunTasks() //Do usuniecia
-        {
-            int totalCost = 0;
-            simulationTimeScale = 1;
-
-            Console.WriteLine($"\nRunning tasks in scale x{simulationTimeScale}:");
-
-            progress = Enumerable.Repeat(-2, taskGraph.GetVerticesSize()).ToList(); // -2 - can't be done flag
-            progress[0] = -1;
-
-            var tasks = new List<Task>();
-            int numThreads = instances.Count;
-            bool stop = false;
-            int time = 0;
-
-            var counterTask = Task.Run(() => CountTimer(ref stop, ref time));
-
-            foreach (var inst in instances)
-            {
-                var instanceCopy = inst;
-                tasks.Add(Task.Run(() => TaskRunner(instanceCopy)));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-            stop = true;
-            counterTask.Wait();
-
-            Console.WriteLine($"\n\nProgram execution time: {time} milliseconds. (scale x{simulationTimeScale})\n\n");
-        }
-
         public Hardware GetLowestTimeHardware(int taskId, int timeCost) 
         {
             int minValue = INF;
@@ -1208,101 +1162,6 @@ namespace Tasks
             taskInstanceMap.Remove(taskId);
         }
 
-        public void TaskRunner(Instance inst) //Do usuniecia
-        {
-            if (inst == null || inst.GetHardwarePtr() == null)
-            {
-                Console.Error.WriteLine("Invalid instance or hardware.");
-                return;
-            }
-
-            while (true)
-            {
-                int taskId = -1;
-                lock (progress)
-                {
-                    taskId = GetNextTask();
-                    if (taskId == -1) // No more tasks to process
-                        break;
-
-                    if (progress[taskId] == -1) // Task is ready to start
-                    {
-                        progress[taskId] = 0; // Mark as in progress
-                    }
-                    else
-                    {
-                        continue; // Task is not ready or already processed
-                    }
-                }
-
-                // Get times and costs for the task using the CostList.times field
-                var taskTimes = times.GetTimes(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                var taskCosts = times.GetCosts(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                int maxTime = 0;
-                int startTime = GetInstanceStartingTime(inst);
-
-                try
-                {
-                    if (taskTimes.Count > 1) // Handle subtasks (parallel execution)
-                    {
-                        var subtaskEndTimes = new List<int>();
-                        var subtaskTasks = new List<Task>();
-
-                        for (int s = 0; s < taskTimes.Count; s++)
-                        {
-                            int subtaskIndex = s;
-                            int subtaskTime = taskTimes[subtaskIndex];
-                            if (subtaskTime < 0)
-                            {
-                                Console.Error.WriteLine($"Invalid subtask time for task {taskId}, subtask {subtaskIndex}.");
-                                continue;
-                            }
-
-                            var subtask = Task.Run(() =>
-                            {
-                                Thread.Sleep(subtaskTime * simulationTimeScale);
-                                lock (subtaskEndTimes)
-                                {
-                                    subtaskEndTimes.Add(startTime + subtaskTime);
-                                }
-                            });
-                            subtaskTasks.Add(subtask);
-                        }
-
-                        // Wait for all subtasks to complete
-                        Task.WhenAll(subtaskTasks).Wait();
-
-                        maxTime = subtaskEndTimes.Any() ? subtaskEndTimes.Max() : startTime;
-                    }
-                    else // Handle single task
-                    {
-                        int timeCost = taskTimes.Count > 0 ? taskTimes[0] : 0;
-                        if (timeCost < 0)
-                        {
-                            Console.Error.WriteLine($"Invalid time for task {taskId}.");
-                            timeCost = 0;
-                        }
-                        Thread.Sleep(timeCost * simulationTimeScale);
-                        maxTime = startTime + timeCost;
-                    }
-
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark task as completed
-                        taskSchedule[taskId] = new Tuple<int, int>(startTime, maxTime);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error processing task {taskId}: {ex.Message}");
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark as completed to avoid stalling
-                    }
-                }
-            }
-        }
-
         void PrintSchedule()
         {
             Console.WriteLine("Task schedule:");
@@ -1328,18 +1187,6 @@ namespace Tasks
                 return taskSchedule[taskId].Item2;
             }
             return 0;
-        }
-
-        public int GetNextTask()
-        {
-            for (int i = 0; i < progress.Count; i++)
-            {
-                if (progress[i] == -1)
-                {
-                    return i;
-                }
-            }
-            return -1;
         }
 
         public Instance GetInstance(int taskId)

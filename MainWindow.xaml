@@ -17,7 +17,6 @@
         <StackPanel Grid.Row="0" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="5">
             <Button x:Name="LoadButton" Content="Load File" Click="LoadButton_Click" Margin="5" Width="100" ToolTip="Load a task graph from a text file."/>
             <Button x:Name="GenerateButton" Content="Generate Random" Click="GenerateButton_Click" Margin="5" Width="100" ToolTip="Generate a random task graph with specified parameters."/>
-            <Button x:Name="RunButton" Content="Run Simulation" Click="RunButton_Click" Margin="5" Width="100" ToolTip="Run the task scheduling simulation."/>
             <Button x:Name="SaveButton" Content="Save to File" Click="SaveButton_Click" Margin="5" Width="100" ToolTip="Save the current task graph to a file."/>
             <Button x:Name="AssignFastestButton" Content="Assign Fastest" Click="AssignFastestButton_Click" Margin="5" Width="100" ToolTip="Assign all tasks to the fastest hardware."/>
             <Button x:Name="AssignCheapestButton" Content="Assign Cheapest" Click="AssignCheapestButton_Click" Margin="5" Width="100" ToolTip="Assign all tasks to the cheapest hardware."/>

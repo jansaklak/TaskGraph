@@ -30,7 +30,6 @@ namespace TaskGraphWPF
         {
             LoadButton.ToolTip = "Load a task graph from a text file.";
             GenerateButton.ToolTip = "Generate a random task graph.";
-            RunButton.ToolTip = "Run the task scheduling simulation.";
             SaveButton.ToolTip = "Save the current task graph to a file.";
             AssignFastestButton.ToolTip = "Assign each task to the hardware that executes it the fastest.";
             AssignCheapestButton.ToolTip = "Assign all tasks to the cheapest hardware.";
@@ -134,7 +133,6 @@ namespace TaskGraphWPF
                 await Task.Run(() =>
                 {
                     costList.taskDistribution(0);
-                    costList.RunTasks();
                 });
                 await UpdateUIAsync();
                 MessageBox.Show("Simulation completed.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
