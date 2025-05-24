@@ -207,59 +207,6 @@ namespace Tasks
         }
     }
 
-    public class COM
-    {
-        private int bandwidth;
-        private int cost;
-        private int id;
-        private HashSet<Hardware> connectedHardware = new HashSet<Hardware>();
-
-        public int GetBandwidth() => bandwidth;
-        public int GetCost() => cost;
-        public int GetID() => id;
-
-        public COM(int bandwidth, int cost, int id)
-        {
-            this.bandwidth = bandwidth;
-            this.cost = cost;
-            this.id = id;
-        }
-
-        public void AddHardware(Hardware hw)
-        {
-            connectedHardware.Add(hw);
-        }
-
-        public bool IsConnected(Hardware hw)
-        {
-            return connectedHardware.Contains(hw);
-        }
-
-        public int GetSize() => connectedHardware.Count;
-
-        public void PrintCOM(int hwCount, TextWriter writer)
-        {
-            writer.Write($"CHAN{id} {cost} {bandwidth}");
-
-            foreach (var hw in Enumerable.Range(0, hwCount))
-            {
-                var found = false;
-                foreach (var connHw in connectedHardware)
-                {
-                    if (connHw.GetID() == hw)
-                    {
-                        writer.Write(" 1");
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    writer.Write(" 0");
-            }
-            writer.WriteLine();
-        }
-    }
-
     public class Instance : IComparable<Instance>
     {
         private int id;
@@ -490,7 +437,6 @@ namespace Tasks
     public class CostList
     {
         private List<Hardware> hardwares = new List<Hardware>();
-        private List<COM> channels = new List<COM>();
         public Times times = new Times();
         private Graf taskGraph = new Graf();
         private Dictionary<int, int> hwInstancesCount = new Dictionary<int, int>();
@@ -523,7 +469,6 @@ namespace Tasks
             times = new Times();
             taskGraph = new Graf();
             hardwares = new List<Hardware>();
-            channels = new List<COM>();
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
@@ -538,7 +483,6 @@ namespace Tasks
             times = new Times(tasks);
             taskGraph = new Graf(tasks, maxTasks);
             hardwares = new List<Hardware>();
-            channels = new List<COM>();
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
@@ -801,13 +745,11 @@ namespace Tasks
         }
 
         public List<Hardware> GetHardwares() => hardwares;
-        public List<COM> GetCOMS() => channels;
         public Graf GetGraph() => taskGraph;
 
         public void Clear()
         {
             hardwares.Clear();
-            channels.Clear();
             times = new Times();
             taskGraph = new Graf();
             hwInstancesCount.Clear();
@@ -915,28 +857,6 @@ namespace Tasks
                                     case 3:
                                         costsMatrix.Add(ParseMatrixLine(line));
                                         break;
-
-                                    case 4:
-                                        var ch = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (ch.Length >= 3 && (ch[0].StartsWith("CHAN") || ch[0].StartsWith("CH0")))
-                                        {
-                                            string chanLabel = ch[0].Replace("CH0", "CHAN0");
-                                            int chanNum = int.Parse(chanLabel[4..]); // "CHAN" has 4 characters
-                                            int comCost = int.Parse(ch[1]);
-                                            int bandwidth = int.Parse(ch[2]);
-                                            var c = new COM(bandwidth, comCost, chanNum);
-
-                                            for (int i = 3; i < ch.Length; i++)
-                                            {
-                                                if (ch[i] == "1" && i - 3 < hardwares.Count)
-                                                    c.AddHardware(hardwares[i - 3]);
-                                            }
-
-                                            channels.Add(c);
-                                        }
-                                        break;
-
-
                                     default:
                                         throw new Exception("Unexpected section or malformed file.");
                                 }
@@ -1065,17 +985,6 @@ namespace Tasks
             }
         }
 
-        public void PrintCOMS(TextWriter writer = null)
-        {
-            var output = writer ?? Console.Out;
-            output.WriteLine($"@comm {channels.Count}");
-
-            foreach (var c in channels)
-            {
-                c.PrintCOM(hardwares.Count, output);
-            }
-        }
-
         public void PrintProc(TextWriter writer = null)
         {
             var output = writer ?? Console.Out;
@@ -1169,7 +1078,6 @@ namespace Tasks
             GetRandomProc(hardwareCoresAmount, processingUnitAmount);
             times.LoadHW(hardwares);
             times.SetRandomTimesAndCosts();
-            ConnectRandomCH(channelsAmount);
         }
 
         public void PrintALL(string filename, bool toScreen = false)
@@ -1190,9 +1098,6 @@ namespace Tasks
                     if (toScreen) times.Show();
                     times.Show(outputFile);
 
-                    // @coms
-                    PrintCOMS(outputFile);
-                    if (toScreen) PrintCOMS();
                 }
 
                 Console.WriteLine($"Saved list to file {filename}");
@@ -1250,114 +1155,6 @@ namespace Tasks
 
             return 1;
         }
-
-        public void ConnectRandomCH()
-        {
-            if (channelsAmount < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            for (int i = 0; i < channelsAmount; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                int rd;
-
-                var com = new COM(bd, conCost, channels.Count);
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
-
-        public void ConnectRandomCH(int coms)
-        {
-            if (coms < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            channels.Clear(); // Clear existing channels
-
-            for (int i = 0; i < coms; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                var com = new COM(bd, conCost, i); // Use i as channel ID
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    int rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
-
-
 
         public void RunTasks()
         {
