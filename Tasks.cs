@@ -164,103 +164,27 @@ namespace Tasks
         }
     }
 
-    public enum HardwareType //Do usuniecia
+    public class Hardware
     {
-        HC = 1, // Hardware Core
-        PE = 2  // Processing Element
-    }
-
-
-
-    public class Hardware : IComparable<Hardware>
-    {
-        private int cost;
-        private HardwareType type;
+        private int cost = 0;
         private int id;
 
-        public Hardware(int cost, HardwareType type, int id)
+        public Hardware(int id)
         {
-            this.cost = cost;
-            this.type = type;
+            this.cost = 0;
             this.id = id;
         }
 
         public int GetCost() => cost;
-        public HardwareType GetType() => type;
         public int GetID() => id;
 
         public void PrintHW(TextWriter writer)
         {
-            writer.Write($"{cost} {(int)type} {id}");
-        }
-
-        public int CompareTo(Hardware other)
-        {
-            if (type != other.type)
-                return type.CompareTo(other.type);
-            return id.CompareTo(other.id);
-        }
-
-        public override string ToString()
-        {
-            return $"{(type == HardwareType.HC ? "HC" : "PE")}{id}";
+            writer.Write($"{cost} {id}");
         }
     }
 
-    public class COM //Do usuniecia
-    {
-        private int bandwidth;
-        private int cost;
-        private int id;
-        private HashSet<Hardware> connectedHardware = new HashSet<Hardware>();
-
-        public int GetBandwidth() => bandwidth;
-        public int GetCost() => cost;
-        public int GetID() => id;
-
-        public COM(int bandwidth, int cost, int id)
-        {
-            this.bandwidth = bandwidth;
-            this.cost = cost;
-            this.id = id;
-        }
-
-        public void AddHardware(Hardware hw)
-        {
-            connectedHardware.Add(hw);
-        }
-
-        public bool IsConnected(Hardware hw)
-        {
-            return connectedHardware.Contains(hw);
-        }
-
-        public int GetSize() => connectedHardware.Count;
-
-        public void PrintCOM(int hwCount, TextWriter writer)
-        {
-            writer.Write($"CHAN{id} {cost} {bandwidth}");
-
-            foreach (var hw in Enumerable.Range(0, hwCount))
-            {
-                var found = false;
-                foreach (var connHw in connectedHardware)
-                {
-                    if (connHw.GetID() == hw)
-                    {
-                        writer.Write(" 1");
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    writer.Write(" 0");
-            }
-            writer.WriteLine();
-        }
-    }
-
-    public class Instance : IComparable<Instance>
+    public class Instance
     {
         private int id;
         private Hardware hardware;
@@ -285,12 +209,6 @@ namespace Tasks
             taskSet.Remove(taskId);
         }
 
-        public int CompareTo(Instance other)
-        {
-            if (hardware.GetType() != other.hardware.GetType())
-                return hardware.GetType().CompareTo(other.hardware.GetType());
-            return id.CompareTo(other.id);
-        }
 
         public override string ToString()
         {
@@ -490,7 +408,6 @@ namespace Tasks
     public class CostList
     {
         private List<Hardware> hardwares = new List<Hardware>();
-        private List<COM> channels = new List<COM>();//Do usuniecia
         public Times times = new Times();
         private Graf taskGraph = new Graf();
         private Dictionary<int, int> hwInstancesCount = new Dictionary<int, int>(); 
@@ -498,17 +415,13 @@ namespace Tasks
         private Dictionary<int, Instance> taskInstanceMap = new Dictionary<int, Instance>();
         private Dictionary<int, Tuple<int, int>> taskSchedule = new Dictionary<int, Tuple<int, int>>();
         private List<Hardware> hwToTasks = new List<Hardware>();
-        private List<int> progress = new List<int>();//Do usuniecia - miało być do symulacji
-        private int simulationTimeScale = 1;
         private int totalCost = 0;
         private const int INF = 2000000000;
         private const int SCALE = 100;
         private static Random random = new Random();
 
+        private int jeepAmount;
         private int tasksAmount;
-        private int hardwareCoresAmount;
-        private int processingUnitAmount;
-        private int channelsAmount;
         private int withCost;
 
         public Times GetTimes() => times;
@@ -523,30 +436,25 @@ namespace Tasks
             times = new Times();
             taskGraph = new Graf();
             hardwares = new List<Hardware>();
-            channels = new List<COM>();
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>();
+
             totalCost = 0;
             tasksAmount = 0;
         }
 
-        public CostList(int tasks, int hcs, int pes, int coms, int maxTasks)
+        public CostList(int tasks, int jeeps, int maxTasks)
         {
             tasksAmount = tasks;
             times = new Times(tasks);
             taskGraph = new Graf(tasks, maxTasks);
             hardwares = new List<Hardware>();
-            channels = new List<COM>();
             instances = new List<Instance>();
             taskInstanceMap = new Dictionary<int, Instance>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>(new int[tasks]);
+            jeepAmount = jeeps;
             totalCost = 0;
-            hardwareCoresAmount = hcs;
-            processingUnitAmount = pes;
-            channelsAmount = coms;
             withCost = 1;
         }
 
@@ -704,19 +612,6 @@ namespace Tasks
             Console.WriteLine($"Assigned {numAllocated} tasks to {cheapestHw}. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
         }
 
-
-
-
-        private void CountTimer(ref bool stop, ref int time) //Do usuniecia
-        {
-            var start = Stopwatch.StartNew();
-            while (!stop)
-            {
-                time = (int)start.ElapsedMilliseconds;
-                Thread.Sleep(1);
-            }
-        }
-
         public int GetInstanceStartingTime(Instance inst)
         {
             int startingTime = 0;
@@ -801,13 +696,11 @@ namespace Tasks
         }
 
         public List<Hardware> GetHardwares() => hardwares;
-        public List<COM> GetCOMS() => channels;
         public Graf GetGraph() => taskGraph;
 
         public void Clear()
         {
             hardwares.Clear();
-            channels.Clear();
             times = new Times();
             taskGraph = new Graf();
             hwInstancesCount.Clear();
@@ -903,7 +796,7 @@ namespace Tasks
                                             hwCost = int.Parse(p[0]);
                                             hwType = int.Parse(p[1]);
                                             int hwId = int.Parse(p[2]);
-                                            var hw = new Hardware(hwCost, (HardwareType)hwType, hwIdCounter++);
+                                            var hw = new Hardware(hwIdCounter++);
                                             hardwares.Add(hw);
                                         }
                                         break;
@@ -914,26 +807,6 @@ namespace Tasks
 
                                     case 3:
                                         costsMatrix.Add(ParseMatrixLine(line));
-                                        break;
-
-                                    case 4:
-                                        var ch = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (ch.Length >= 3 && (ch[0].StartsWith("CHAN") || ch[0].StartsWith("CH0")))
-                                        {
-                                            string chanLabel = ch[0].Replace("CH0", "CHAN0");
-                                            int chanNum = int.Parse(chanLabel[4..]); // "CHAN" has 4 characters
-                                            int comCost = int.Parse(ch[1]);
-                                            int bandwidth = int.Parse(ch[2]);
-                                            var c = new COM(bandwidth, comCost, chanNum);
-
-                                            for (int i = 3; i < ch.Length; i++)
-                                            {
-                                                if (ch[i] == "1" && i - 3 < hardwares.Count)
-                                                    c.AddHardware(hardwares[i - 3]);
-                                            }
-
-                                            channels.Add(c);
-                                        }
                                         break;
 
 
@@ -1065,17 +938,6 @@ namespace Tasks
             }
         }
 
-        public void PrintCOMS(TextWriter writer = null) //Do usuniecia
-        {
-            var output = writer ?? Console.Out;
-            output.WriteLine($"@comm {channels.Count}");
-
-            foreach (var c in channels)
-            {
-                c.PrintCOM(hardwares.Count, output);
-            }
-        }
-
         public void PrintProc(TextWriter writer = null)
         {
             var output = writer ?? Console.Out;
@@ -1166,10 +1028,9 @@ namespace Tasks
         {
             times = new Times(tasksAmount); // Initialize the field
             CreateRandomTasksGraph();
-            GetRandomProc(hardwareCoresAmount, processingUnitAmount);
+            GetRandomProc();
             times.LoadHW(hardwares);
             times.SetRandomTimesAndCosts();
-            ConnectRandomCH(channelsAmount);
         }
 
         public void PrintALL(string filename, bool toScreen = false)
@@ -1190,9 +1051,6 @@ namespace Tasks
                     if (toScreen) times.Show();
                     times.Show(outputFile);
 
-                    // @coms
-                    PrintCOMS(outputFile);
-                    if (toScreen) PrintCOMS();
                 }
 
                 Console.WriteLine($"Saved list to file {filename}");
@@ -1205,189 +1063,16 @@ namespace Tasks
 
         public int GetRandomProc()
         {
-            hardwares.Clear();
 
-            if (hardwareCoresAmount < 1 || processingUnitAmount < 1)
+            for (int i = 0; i < jeepAmount; i++)
             {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hardwareCoresAmount; i++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
-            }
-
-            int hcSize = hardwareCoresAmount;
-            for (int j = 0; j < processingUnitAmount; j++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
+                hardwares.Add(new Hardware(hardwares.Count));
             }
 
             return 1;
         }
 
-        public int GetRandomProc(int hcs, int pes)
-        {
-            hardwares.Clear();
 
-            if (hcs < 1 || pes < 1)
-            {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hcs; i++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
-            }
-
-            int hcSize = hcs;
-            for (int j = 0; j < pes; j++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
-            }
-
-            return 1;
-        }
-
-        public void ConnectRandomCH() //Do usuniecia
-        {
-            if (channelsAmount < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            for (int i = 0; i < channelsAmount; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                int rd;
-
-                var com = new COM(bd, conCost, channels.Count);
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
-
-        public void ConnectRandomCH(int coms) //Do usuniecia
-        { 
-            if (coms < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            channels.Clear(); // Clear existing channels
-
-            for (int i = 0; i < coms; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                var com = new COM(bd, conCost, i); // Use i as channel ID
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    int rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
-
-
-
-        public void RunTasks() //Do usuniecia
-        {
-            int totalCost = 0;
-            simulationTimeScale = 1;
-
-            Console.WriteLine($"\nRunning tasks in scale x{simulationTimeScale}:");
-
-            progress = Enumerable.Repeat(-2, taskGraph.GetVerticesSize()).ToList(); // -2 - can't be done flag
-            progress[0] = -1;
-
-            var tasks = new List<Task>();
-            int numThreads = instances.Count;
-            bool stop = false;
-            int time = 0;
-
-            var counterTask = Task.Run(() => CountTimer(ref stop, ref time));
-
-            foreach (var inst in instances)
-            {
-                var instanceCopy = inst;
-                tasks.Add(Task.Run(() => TaskRunner(instanceCopy)));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-            stop = true;
-            counterTask.Wait();
-
-            Console.WriteLine($"\n\nProgram execution time: {time} milliseconds. (scale x{simulationTimeScale})\n\n");
-        }
 
         public Hardware GetLowestTimeHardware(int taskId, int timeCost) 
         {
@@ -1440,101 +1125,6 @@ namespace Tasks
             taskInstanceMap.Remove(taskId);
         }
 
-        public void TaskRunner(Instance inst) //Do usuniecia
-        {
-            if (inst == null || inst.GetHardwarePtr() == null)
-            {
-                Console.Error.WriteLine("Invalid instance or hardware.");
-                return;
-            }
-
-            while (true)
-            {
-                int taskId = -1;
-                lock (progress)
-                {
-                    taskId = GetNextTask();
-                    if (taskId == -1) // No more tasks to process
-                        break;
-
-                    if (progress[taskId] == -1) // Task is ready to start
-                    {
-                        progress[taskId] = 0; // Mark as in progress
-                    }
-                    else
-                    {
-                        continue; // Task is not ready or already processed
-                    }
-                }
-
-                // Get times and costs for the task using the CostList.times field
-                var taskTimes = times.GetTimes(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                var taskCosts = times.GetCosts(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                int maxTime = 0;
-                int startTime = GetInstanceStartingTime(inst);
-
-                try
-                {
-                    if (taskTimes.Count > 1) // Handle subtasks (parallel execution)
-                    {
-                        var subtaskEndTimes = new List<int>();
-                        var subtaskTasks = new List<Task>();
-
-                        for (int s = 0; s < taskTimes.Count; s++)
-                        {
-                            int subtaskIndex = s;
-                            int subtaskTime = taskTimes[subtaskIndex];
-                            if (subtaskTime < 0)
-                            {
-                                Console.Error.WriteLine($"Invalid subtask time for task {taskId}, subtask {subtaskIndex}.");
-                                continue;
-                            }
-
-                            var subtask = Task.Run(() =>
-                            {
-                                Thread.Sleep(subtaskTime * simulationTimeScale);
-                                lock (subtaskEndTimes)
-                                {
-                                    subtaskEndTimes.Add(startTime + subtaskTime);
-                                }
-                            });
-                            subtaskTasks.Add(subtask);
-                        }
-
-                        // Wait for all subtasks to complete
-                        Task.WhenAll(subtaskTasks).Wait();
-
-                        maxTime = subtaskEndTimes.Any() ? subtaskEndTimes.Max() : startTime;
-                    }
-                    else // Handle single task
-                    {
-                        int timeCost = taskTimes.Count > 0 ? taskTimes[0] : 0;
-                        if (timeCost < 0)
-                        {
-                            Console.Error.WriteLine($"Invalid time for task {taskId}.");
-                            timeCost = 0;
-                        }
-                        Thread.Sleep(timeCost * simulationTimeScale);
-                        maxTime = startTime + timeCost;
-                    }
-
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark task as completed
-                        taskSchedule[taskId] = new Tuple<int, int>(startTime, maxTime);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error processing task {taskId}: {ex.Message}");
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark as completed to avoid stalling
-                    }
-                }
-            }
-        }
-
         void PrintSchedule()
         {
             Console.WriteLine("Task schedule:");
@@ -1560,18 +1150,6 @@ namespace Tasks
                 return taskSchedule[taskId].Item2;
             }
             return 0;
-        }
-
-        public int GetNextTask()
-        {
-            for (int i = 0; i < progress.Count; i++)
-            {
-                if (progress[i] == -1)
-                {
-                    return i;
-                }
-            }
-            return -1;
         }
 
         public Instance GetInstance(int taskId)

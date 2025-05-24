@@ -30,7 +30,7 @@ namespace TaskGraphWPF
         {
             LoadButton.ToolTip = "Load a task graph from a text file.";
             GenerateButton.ToolTip = "Generate a random task graph.";
-            RunButton.ToolTip = "Run the task scheduling simulation.";
+
             SaveButton.ToolTip = "Save the current task graph to a file.";
             AssignFastestButton.ToolTip = "Assign each task to the hardware that executes it the fastest.";
             AssignCheapestButton.ToolTip = "Assign all tasks to the cheapest hardware.";
@@ -77,19 +77,8 @@ namespace TaskGraphWPF
                     MessageBox.Show("Invalid number of tasks. Enter a number between 1 and 100.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
-                if (!int.TryParse(HCTextBox.Text, out int hcs) || hcs < 0 || hcs > 10)
-                {
-                    MessageBox.Show("Invalid number of HCs. Enter a number between 0 and 10.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                if (!int.TryParse(PUTextBox.Text, out int pus) || pus < 0 || pus > 10)
-                {
-                    MessageBox.Show("Invalid number of PUs. Enter a number between 0 and 10.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                if (!int.TryParse(COMTextBox.Text, out int coms) || coms < 0 || coms > 10)
-                {
-                    MessageBox.Show("Invalid number of COMs. Enter a number between 0 and 10.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (!int.TryParse(JeepsTextBox.Text, out int jeeps) || jeeps < 1 || jeeps > 10) {
+                    MessageBox.Show("Invalid jeeps per instance. Enter a number between 1 and 10.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
                 if (!int.TryParse(MaxTasksTextBox.Text, out int maxTasks) || maxTasks < 1 || maxTasks > 5)
@@ -103,7 +92,7 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                costList = new CostList(tasks, hcs, pus, coms, maxTasks);
+                costList = new CostList(tasks, jeeps, maxTasks);
                 costList.RandALL();
 
                 await UpdateUIAsync();
@@ -134,7 +123,6 @@ namespace TaskGraphWPF
                 await Task.Run(() =>
                 {
                     costList.taskDistribution(0);
-                    costList.RunTasks();
                 });
                 await UpdateUIAsync();
                 MessageBox.Show("Simulation completed.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -283,16 +271,6 @@ namespace TaskGraphWPF
             }
 
             COMListBox.Items.Clear();
-            var coms = costList.GetCOMS();
-            if (coms == null || !coms.Any())
-            {
-                COMListBox.Items.Add("No communication channels available.");
-                return;
-            }
-            foreach (var com in coms)
-            {
-                COMListBox.Items.Add($"CH{com.GetID()} (Bandwidth: {com.GetBandwidth()}, Cost: {com.GetCost()}, Connections: {com.GetSize()})");
-            }
         }
 
         private void UpdateGraph()
@@ -419,8 +397,6 @@ namespace TaskGraphWPF
                         costList.PrintProc(writer);
                         writer.WriteLine();
                         costList.GetTimes().Show(writer);
-                        writer.WriteLine();
-                        costList.PrintCOMS(writer);
                         writer.WriteLine();
                         costList.PrintInstances();
                         Dispatcher.Invoke(() => ScheduleTextBox.Text = writer.ToString());

@@ -63,7 +63,7 @@ namespace TaskGraphWPF
                 {
                     Width = nodeSize,
                     Height = nodeSize,
-                    Fill = hw.GetType() == HardwareType.HC ? Brushes.Green : Brushes.Orange,
+                    Fill = Brushes.Green ,
                     Stroke = Brushes.Black,
                     ToolTip = $"{hw} (Cost: {hw.GetCost()})"
                 };
