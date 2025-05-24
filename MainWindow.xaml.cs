@@ -32,9 +32,9 @@ namespace TaskGraphWPF
             GenerateButton.ToolTip = "Generate a random task graph.";
 
             SaveButton.ToolTip = "Save the current task graph to a file.";
-            AssignFastestButton.ToolTip = "Assign each task to the hardware that executes it the fastest.";
-            AssignCheapestButton.ToolTip = "Assign all tasks to the cheapest hardware.";
-            ShowAssignmentsButton.ToolTip = "Display which hardware executes which tasks.";
+            AssignFastestButton.ToolTip = "Assign each task to the worker that executes it the fastest.";
+            AssignCheapestButton.ToolTip = "Assign all tasks to the cheapest worker.";
+            ShowAssignmentsButton.ToolTip = "Display which worker executes which tasks.";
         }
 
         private async void LoadButton_Click(object sender, RoutedEventArgs e)
@@ -72,29 +72,7 @@ namespace TaskGraphWPF
         {
             try
             {
-                if (!int.TryParse(TasksTextBox.Text, out int tasks) || tasks < 1 || tasks > 100)
-                {
-                    MessageBox.Show("Invalid number of tasks. Enter a number between 1 and 100.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                if (!int.TryParse(JeepsTextBox.Text, out int jeeps) || jeeps < 1 || jeeps > 10) {
-                    MessageBox.Show("Invalid jeeps per instance. Enter a number between 1 and 10.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                if (!int.TryParse(MaxTasksTextBox.Text, out int maxTasks) || maxTasks < 1 || maxTasks > 5)
-                {
-                    MessageBox.Show("Invalid max tasks per instance. Enter a number between 1 and 5.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-                if (!int.TryParse(SubtaskProbTextBox.Text, out int subtaskProb) || subtaskProb < 0 || subtaskProb > 100)
-                {
-                    MessageBox.Show("Invalid subtask probability. Enter a percentage between 0 and 100.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    return;
-                }
-
-                costList = new CostList(tasks, jeeps, maxTasks);
-                costList.RandALL();
-
+                costList.CreateRandomTasksGraph();
                 await UpdateUIAsync();
                 MessageBox.Show("Random task graph generated.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
@@ -114,9 +92,9 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                if (costList.GetWorkers() == null || !costList.GetWorkers().Any())
                 {
-                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("No worker resources available. Please generate or load a configuration with worker resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -143,24 +121,41 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                if (costList.GetWorkers() == null || !costList.GetWorkers().Any())
                 {
-                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("No worker resources available. Please generate or load a configuration with worker resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 await Task.Run(() =>
                 {
-                    costList.AssignEachToFastestHardware();
+                    costList.AssignEachToFastestWorker();
                 });
                 await UpdateUIAsync();
-                MessageBox.Show("Each task assigned to its fastest hardware.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("Each task assigned to its fastest worker.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
                 MessageBox.Show($"Error assigning tasks: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
+
+        private async void ButtonAddCompoundTask_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                costList.AddRandomCompoundTask();
+                MessageBox.Show("A new compound task has been added!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                await UpdateUIAsync();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Error adding a new compound task:\n" + ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+
+
 
         private async void AssignCheapestButton_Click(object sender, RoutedEventArgs e)
         {
@@ -172,18 +167,18 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                if (costList.GetWorkers() == null || !costList.GetWorkers().Any())
                 {
-                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("No worker resources available. Please generate or load a configuration with worker resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
                 await Task.Run(() =>
                 {
-                    costList.AssignToCheapestHardware();
+                    costList.AssignToCheapestWorker();
                 });
                 await UpdateUIAsync();
-                MessageBox.Show("All tasks assigned to the cheapest hardware.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show("All tasks assigned to the cheapest worker.", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
@@ -201,13 +196,13 @@ namespace TaskGraphWPF
                     return;
                 }
 
-                if (costList.GetHardwares() == null || !costList.GetHardwares().Any())
+                if (costList.GetWorkers() == null || !costList.GetWorkers().Any())
                 {
-                    MessageBox.Show("No hardware resources available. Please generate or load a configuration with hardware resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    MessageBox.Show("No worker resources available. Please generate or load a configuration with worker resources.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
-                if (costList.GetInstance(0) == null)
+                if (costList.GetAssignment(0) == null)
                 {
                     MessageBox.Show("No tasks assigned. Please run simulation or assign tasks first.", "Error", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
@@ -251,23 +246,23 @@ namespace TaskGraphWPF
 
         private async Task UpdateUIAsync()
         {
-            UpdateHardwareAndCOMs();
+            UpdateWorkerAndCOMs();
             UpdateGraph();
             await UpdateScheduleAsync();
         }
 
-        private void UpdateHardwareAndCOMs()
+        private void UpdateWorkerAndCOMs()
         {
-            HardwareListBox.Items.Clear();
-            var hardwares = costList.GetHardwares();
-            if (hardwares == null || !hardwares.Any())
+            WorkerListBox.Items.Clear();
+            var workers = costList.GetWorkers();
+            if (workers == null || !workers.Any())
             {
-                HardwareListBox.Items.Add("No hardware available.");
+                WorkerListBox.Items.Add("No worker available.");
                 return;
             }
-            foreach (var hw in hardwares)
+            foreach (var wkr in workers)
             {
-                HardwareListBox.Items.Add($"{hw} (Cost: {hw.GetCost()})");
+                WorkerListBox.Items.Add($"{wkr} (Cost: {wkr.GetCost()})");
             }
 
             COMListBox.Items.Clear();
@@ -296,16 +291,16 @@ namespace TaskGraphWPF
                 double y = centerY + radius * Math.Sin(angle);
                 nodePositions[i] = new Point(x, y);
 
-                var hardware = costList.GetHardwares().FirstOrDefault();
-                bool hasSubtasks = hardware != null &&
-                    costList.GetTimes().GetTimes(i, hardware)?.Count > 1;
+                var worker = costList.GetWorkers().FirstOrDefault();
+                bool hasSubtasks = worker != null &&
+                    costList.GetTimes().GetTimes(i, worker)?.Count > 1;
 
-                var times = hardware != null ?
-                    costList.GetTimes().GetTimes(i, hardware) ?? new List<int>() :
+                var times = worker != null ?
+                    costList.GetTimes().GetTimes(i, worker) ?? new List<int>() :
                     new List<int>();
 
-                var costs = hardware != null ?
-                    costList.GetTimes().GetCosts(i, hardware) ?? new List<int>() :
+                var costs = worker != null ?
+                    costList.GetTimes().GetCosts(i, worker) ?? new List<int>() :
                     new List<int>();
 
                 string tooltip = hasSubtasks
@@ -398,7 +393,7 @@ namespace TaskGraphWPF
                         writer.WriteLine();
                         costList.GetTimes().Show(writer);
                         writer.WriteLine();
-                        costList.PrintInstances();
+                        costList.PrintAssignments();
                         Dispatcher.Invoke(() => ScheduleTextBox.Text = writer.ToString());
                     }
                 });
