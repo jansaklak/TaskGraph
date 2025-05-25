@@ -25,7 +25,7 @@ public class AssignmentTest {
         var a3 = new Assignment(1, wkr2);
 
         Assert.IsTrue(a1.CompareTo(a2) < 0);
-        Assert.IsTrue(a2.CompareTo(a1) > 1);
+        Assert.IsTrue(a2.CompareTo(a1) > 0);
         Assert.IsTrue(a1.CompareTo(a3) < 0);
     }
 }
