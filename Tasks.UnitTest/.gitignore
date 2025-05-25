@@ -1,0 +1,7 @@
+################################################################################
+# Ten plik .gitignore zosta³ utworzony automatycznie przez Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/bin/Debug/net8.0-windows
+/obj
