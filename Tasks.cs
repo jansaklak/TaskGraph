@@ -1,14 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Numerics;
-using System.Text;
+﻿using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using System.Timers;
 
 
 namespace Tasks
@@ -164,115 +155,39 @@ namespace Tasks
         }
     }
 
-    public enum HardwareType
+    public class Worker
     {
-        HC = 1, // Hardware Core
-        PE = 2  // Processing Element
-    }
-
-
-
-    public class Hardware : IComparable<Hardware>
-    {
-        private int cost;
-        private HardwareType type;
+        private int cost = 0;
         private int id;
 
-        public Hardware(int cost, HardwareType type, int id)
+        public Worker(int id)
         {
-            this.cost = cost;
-            this.type = type;
+            this.cost = 0;
             this.id = id;
         }
 
         public int GetCost() => cost;
-        public HardwareType GetType() => type;
         public int GetID() => id;
 
-        public void PrintHW(TextWriter writer)
+        public void PrintWkr(TextWriter writer)
         {
-            writer.Write($"{cost} {(int)type} {id}");
-        }
-
-        public int CompareTo(Hardware other)
-        {
-            if (type != other.type)
-                return type.CompareTo(other.type);
-            return id.CompareTo(other.id);
-        }
-
-        public override string ToString()
-        {
-            return $"{(type == HardwareType.HC ? "HC" : "PE")}{id}";
+            writer.Write($"{cost} {id}");
         }
     }
 
-    public class COM
-    {
-        private int bandwidth;
-        private int cost;
-        private int id;
-        private HashSet<Hardware> connectedHardware = new HashSet<Hardware>();
-
-        public int GetBandwidth() => bandwidth;
-        public int GetCost() => cost;
-        public int GetID() => id;
-
-        public COM(int bandwidth, int cost, int id)
-        {
-            this.bandwidth = bandwidth;
-            this.cost = cost;
-            this.id = id;
-        }
-
-        public void AddHardware(Hardware hw)
-        {
-            connectedHardware.Add(hw);
-        }
-
-        public bool IsConnected(Hardware hw)
-        {
-            return connectedHardware.Contains(hw);
-        }
-
-        public int GetSize() => connectedHardware.Count;
-
-        public void PrintCOM(int hwCount, TextWriter writer)
-        {
-            writer.Write($"CHAN{id} {cost} {bandwidth}");
-
-            foreach (var hw in Enumerable.Range(0, hwCount))
-            {
-                var found = false;
-                foreach (var connHw in connectedHardware)
-                {
-                    if (connHw.GetID() == hw)
-                    {
-                        writer.Write(" 1");
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found)
-                    writer.Write(" 0");
-            }
-            writer.WriteLine();
-        }
-    }
-
-    public class Instance : IComparable<Instance>
+    public class Assignment : IComparable<Assignment>
     {
         private int id;
-        private Hardware hardware;
+        private Worker worker;
         private HashSet<int> taskSet = new HashSet<int>();
 
-        public Instance(int id, Hardware hardware)
+        public Assignment(int id, Worker worker)
         {
             this.id = id;
-            this.hardware = hardware;
+            this.worker = worker;
         }
 
-        public Hardware GetHardwarePtr() => hardware;
+        public Worker GetWorkerPtr() => worker;
         public HashSet<int> GetTaskSet() => taskSet;
 
         public void AddTask(int taskId)
@@ -285,16 +200,18 @@ namespace Tasks
             taskSet.Remove(taskId);
         }
 
-        public int CompareTo(Instance other)
-        {
-            if (hardware.GetType() != other.hardware.GetType())
-                return hardware.GetType().CompareTo(other.hardware.GetType());
-            return id.CompareTo(other.id);
-        }
-
         public override string ToString()
         {
-            return $"{hardware}{id}";
+            return $"{worker}{id}";
+        }
+
+        public int CompareTo(Assignment other)
+        {
+            if (other == null) return 1;
+            // Najpierw sortuj po ID worker, potem po ID instancji
+            int cmp = worker.GetID().CompareTo(other.worker.GetID());
+            if (cmp != 0) return cmp;
+            return id.CompareTo(other.id);
         }
     }
 
@@ -323,7 +240,8 @@ namespace Tasks
     public class Times
     {
         private List<List<TimeAndCost>> timesAndCosts = new List<List<TimeAndCost>>();
-        private List<Hardware> hardwares = new List<Hardware>();
+        private List<Worker> wkrs = new List<Worker>();
+        public List<List<TimeAndCost>> TimeAndCosts => timesAndCosts;
         private static Random random = new Random();
         private const int SCALE = 100;
 
@@ -339,15 +257,15 @@ namespace Tasks
             }
         }
 
-        public void LoadHW(List<Hardware> hws)
+        public void LoadWkr(List<Worker> workers)
         {
-            hardwares = new List<Hardware>(hws);
-            foreach (var hwList in timesAndCosts)
+            wkrs = new List<Worker>(workers);
+            foreach (var wkrList in timesAndCosts)
             {
-                hwList.Clear();
-                foreach (var hw in hardwares)
+                wkrList.Clear();
+                foreach (var wkr in wkrs)
                 {
-                    hwList.Add(new TimeAndCost()); // Empty TimeAndCost, ready for single or subtask values
+                    wkrList.Add(new TimeAndCost());
                 }
             }
         }
@@ -359,7 +277,7 @@ namespace Tasks
                 bool hasSubtasks = random.Next(0, 100) < subtaskProbability;
                 int subtaskCount = hasSubtasks ? random.Next(minSubtasks, maxSubtasks + 1) : 1;
 
-                for (int h = 0; h < hardwares.Count; h++)
+                for (int h = 0; h < wkrs.Count; h++)
                 {
                     if (hasSubtasks)
                     {
@@ -372,12 +290,10 @@ namespace Tasks
                             costs.Add(random.Next(minValue, maxValue + 1));
                         }
 
-                        // Use the vector version of times and costs for subtasks
                         timesAndCosts[t][h] = new TimeAndCost(times, costs);
                     }
                     else
                     {
-                        // Single value for non-subtask tasks
                         int time = random.Next(minValue, maxValue + 1);
                         int cost = random.Next(minValue, maxValue + 1);
                         timesAndCosts[t][h] = new TimeAndCost(time, cost);
@@ -439,18 +355,18 @@ namespace Tasks
             }
         }
 
-        public List<int> GetTimes(int taskId, Hardware hw)
+        public List<int> GetTimes(int taskId, Worker wkr)
         {
-            if (taskId >= timesAndCosts.Count || hw.GetID() >= timesAndCosts[taskId].Count)
+            if (taskId >= timesAndCosts.Count || wkr.GetID() >= timesAndCosts[taskId].Count)
                 return new List<int>();
-            return timesAndCosts[taskId][hw.GetID()].Times;
+            return timesAndCosts[taskId][wkr.GetID()].Times;
         }
 
-        public List<int> GetCosts(int taskId, Hardware hw)
+        public List<int> GetCosts(int taskId, Worker wkr)
         {
-            if (taskId >= timesAndCosts.Count || hw.GetID() >= timesAndCosts[taskId].Count)
+            if (taskId >= timesAndCosts.Count || wkr.GetID() >= timesAndCosts[taskId].Count)
                 return new List<int>();
-            return timesAndCosts[taskId][hw.GetID()].Costs;
+            return timesAndCosts[taskId][wkr.GetID()].Costs;
         }
 
         public void Show(TextWriter writer = null)
@@ -489,235 +405,234 @@ namespace Tasks
 
     public class CostList
     {
-        private List<Hardware> hardwares = new List<Hardware>();
-        private List<COM> channels = new List<COM>();
+        private List<Worker> workers = new List<Worker>();
         public Times times = new Times();
         private Graf taskGraph = new Graf();
-        private Dictionary<int, int> hwInstancesCount = new Dictionary<int, int>();
-        private List<Instance> instances = new List<Instance>();
-        private Dictionary<int, Instance> taskInstanceMap = new Dictionary<int, Instance>();
+        private Dictionary<int, int> workerAssignmentsCount = new Dictionary<int, int>(); 
+        private List<Assignment> Assignments = new List<Assignment>();
+        private Dictionary<int, Assignment> taskAssignmentMap = new Dictionary<int, Assignment>();
         private Dictionary<int, Tuple<int, int>> taskSchedule = new Dictionary<int, Tuple<int, int>>();
-        private List<Hardware> hwToTasks = new List<Hardware>();
-        private List<int> progress = new List<int>();
-        private int simulationTimeScale = 1;
+        private List<Worker> workerToTasks = new List<Worker>();
         private int totalCost = 0;
         private const int INF = 2000000000;
         private const int SCALE = 100;
         private static Random random = new Random();
 
+        private int jeepAmount;
         private int tasksAmount;
-        private int hardwareCoresAmount;
-        private int processingUnitAmount;
-        private int channelsAmount;
         private int withCost;
 
         public Times GetTimes() => times;
 
-        public List<Instance> GetInstances()
+        public List<Assignment> GetAssignments()
         {
-            return instances;
+            return Assignments;
         }
 
         public CostList()
         {
             times = new Times();
             taskGraph = new Graf();
-            hardwares = new List<Hardware>();
-            channels = new List<COM>();
-            instances = new List<Instance>();
-            taskInstanceMap = new Dictionary<int, Instance>();
+            workers = new List<Worker>();
+            Assignments = new List<Assignment>();
+            taskAssignmentMap = new Dictionary<int, Assignment>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>();
+
             totalCost = 0;
             tasksAmount = 0;
         }
 
-        public CostList(int tasks, int hcs, int pes, int coms, int maxTasks)
+        public CostList(int tasks, int jeeps, int maxTasks)
         {
             tasksAmount = tasks;
             times = new Times(tasks);
             taskGraph = new Graf(tasks, maxTasks);
-            hardwares = new List<Hardware>();
-            channels = new List<COM>();
-            instances = new List<Instance>();
-            taskInstanceMap = new Dictionary<int, Instance>();
+            workers = new List<Worker>();
+            Assignments = new List<Assignment>();
+            taskAssignmentMap = new Dictionary<int, Assignment>();
             taskSchedule = new Dictionary<int, Tuple<int, int>>();
-            progress = new List<int>(new int[tasks]);
+            jeepAmount = jeeps;
             totalCost = 0;
-            hardwareCoresAmount = hcs;
-            processingUnitAmount = pes;
-            channelsAmount = coms;
             withCost = 1;
         }
 
-
-        public void AssignEachToFastestHardware()
+        public void AddRandomCompoundTask(int minSubtasks = 2, int maxSubtasks = 5)
         {
-            if (taskGraph == null || hardwares == null || hardwares.Count == 0)
+
+            if (times == null || times.TimeAndCosts == null || times.TimeAndCosts.Count == 0 || workers == null || workers.Count == 0)
+                return;
+
+            int numSubtasks = random.Next(minSubtasks, maxSubtasks + 1);
+
+            var picked = new List<(int taskIdx, int subIdx)>();
+
+            for (int i = 0; i < numSubtasks; i++)
             {
-                Console.Error.WriteLine("Invalid task graph or hardware list.");
+                int taskCount = times.TimeAndCosts.Count;
+                int taskIdx = random.Next(taskCount);
+
+                int subCount = times.TimeAndCosts[taskIdx][0].Times.Count;
+                if (subCount == 0) subCount = 1;
+                int subIdx = random.Next(subCount);
+
+                picked.Add((taskIdx, subIdx));
+            }
+
+            var newTask = new List<TimeAndCost>();
+            for (int w = 0; w < workers.Count; w++)
+            {
+                var subTimes = new List<int>();
+                var subCosts = new List<int>();
+                foreach (var (taskIdx, subIdx) in picked)
+                {
+                    var tc = times.TimeAndCosts[taskIdx][w];
+                    int t = (tc.Times.Count > subIdx) ? tc.Times[subIdx] : (tc.Times.Count > 0 ? tc.Times[0] : 0);
+                    int c = (tc.Costs.Count > subIdx) ? tc.Costs[subIdx] : (tc.Costs.Count > 0 ? tc.Costs[0] : 0);
+                    subTimes.Add(t);
+                    subCosts.Add(c);
+                }
+                newTask.Add(new TimeAndCost(subTimes, subCosts));
+            }
+
+            times.TimeAndCosts.Add(newTask);
+
+            tasksAmount += 1;
+
+            taskGraph.GetAdjList().Add(new List<Edge>());
+
+        }
+
+
+
+        public void AssignEachToFastestWorker()
+        {
+            if (taskGraph == null || workers == null || workers.Count == 0)
+            {
+                Console.Error.WriteLine("Invalid task graph or worker list.");
                 return;
             }
 
-            // Clear existing instances and mappings
-            instances.Clear();
-            taskInstanceMap.Clear();
-            hwInstancesCount.Clear();
+            Assignments.Clear();
+            taskAssignmentMap.Clear();
+            workerAssignmentsCount.Clear();
             taskSchedule.Clear();
 
-            // Dictionary to track instances per hardware
-            Dictionary<Hardware, Instance> hardwareInstances = new Dictionary<Hardware, Instance>();
+            Dictionary<Worker, Assignment> workerAssignments = new Dictionary<Worker, Assignment>();
             int estimatedCost = 0;
             int estimatedTime = 0;
             int numAllocated = 0;
 
-            // Assign each task to the hardware with the lowest execution time
             for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
             {
-                Hardware fastestHw = null;
+                Worker fastestWorker = null;
                 int minTime = int.MaxValue;
 
-                // Find the fastest hardware for this task
-                foreach (var hw in hardwares)
+                foreach (var wkr in workers)
                 {
-                    var allTaskTimes = times.GetTimes(i, hw) ?? new List<int>();
+                    var allTaskTimes = times.GetTimes(i, wkr) ?? new List<int>();
                     int taskTime = allTaskTimes.Count > 1 ? allTaskTimes.Max() : allTaskTimes.FirstOrDefault();
                     if (taskTime < minTime)
                     {
                         minTime = taskTime;
-                        fastestHw = hw;
+                        fastestWorker = wkr;
                     }
                 }
 
-                if (fastestHw == null)
+                if (fastestWorker == null)
                 {
-                    Console.Error.WriteLine($"No suitable hardware found for task {i}.");
+                    Console.Error.WriteLine($"No suitable worker found for task {i}.");
                     continue;
                 }
 
-                // Get or create an instance for this hardware
-                if (!hardwareInstances.TryGetValue(fastestHw, out var inst))
+                if (!workerAssignments.TryGetValue(fastestWorker, out var inst))
                 {
-                    int instId = hwInstancesCount.ContainsKey(fastestHw.GetID()) ? hwInstancesCount[fastestHw.GetID()] : 0;
-                    inst = new Instance(instId, fastestHw);
-                    instances.Add(inst);
-                    hardwareInstances[fastestHw] = inst;
-                    hwInstancesCount[fastestHw.GetID()] = instId + 1;
+                    int instId = workerAssignmentsCount.ContainsKey(fastestWorker.GetID()) ? workerAssignmentsCount[fastestWorker.GetID()] : 0;
+                    inst = new Assignment(instId, fastestWorker);
+                    Assignments.Add(inst);
+                    workerAssignments[fastestWorker] = inst;
+                    workerAssignmentsCount[fastestWorker.GetID()] = instId + 1;
                 }
 
-                // Assign task to the instance
-                var taskTimes = times.GetTimes(i, fastestHw) ?? new List<int>();
-                var taskCosts = times.GetCosts(i, fastestHw) ?? new List<int>();
+                var taskTimes = times.GetTimes(i, fastestWorker) ?? new List<int>();
+                var taskCosts = times.GetCosts(i, fastestWorker) ?? new List<int>();
 
-                if (taskTimes.Count > 1) // Subtasks
+                if (taskTimes.Count > 1)
                 {
                     estimatedTime += taskTimes.Max();
                     estimatedCost += taskCosts.Sum();
                 }
-                else // Single task
+                else
                 {
                     estimatedTime += taskTimes.FirstOrDefault();
                     estimatedCost += taskCosts.FirstOrDefault();
                 }
 
                 inst.AddTask(i);
-                taskInstanceMap[i] = inst;
+                taskAssignmentMap[i] = inst;
                 numAllocated++;
             }
 
             totalCost = estimatedCost;
-            Console.WriteLine($"Assigned {numAllocated} tasks to their fastest hardware. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
+            Console.WriteLine($"Assigned {numAllocated} tasks to their fastest worker. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
         }
 
-        public void AssignToCheapestHardware()
+        public void AssignToCheapestWorker()
         {
-            if (taskGraph == null || hardwares == null || hardwares.Count == 0)
             {
-                Console.Error.WriteLine("Invalid task graph or hardware list.");
-                return;
-            }
+                if (taskGraph == null || workers == null || workers.Count == 0)
+                {
+                    Console.Error.WriteLine("Invalid task graph or worker list.");
+                    return;
+                }
 
-            // Clear existing instances and mappings
-            instances.Clear();
-            taskInstanceMap.Clear();
-            hwInstancesCount.Clear();
-            taskSchedule.Clear();
+                
+                Assignments.Clear();
+                taskAssignmentMap.Clear();
+                workerAssignmentsCount.Clear();
+                taskSchedule.Clear();
 
-            // Find the hardware with the lowest total cost
-            Hardware cheapestHw = null;
-            int minTotalCost = int.MaxValue;
+             
+                Dictionary<int, Assignment> workerAssignments = new Dictionary<int, Assignment>();
 
-            foreach (var hw in hardwares)
-            {
-                int totalCost = 0;
                 for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
                 {
-                    var taskCosts = times.GetCosts(i, hw) ?? new List<int>();
-                    totalCost += taskCosts.Count > 1 ? taskCosts.Sum() : taskCosts.FirstOrDefault();
+                    Worker cheapestWorker = null;
+                    int minCost = int.MaxValue;
+
+                    foreach (var wkr in workers)
+                    {
+                        var taskCosts = times.GetCosts(i, wkr) ?? new List<int>();
+                        int cost = taskCosts.Count > 1 ? taskCosts.Sum() : (taskCosts.Count == 1 ? taskCosts[0] : int.MaxValue);
+                        if (cost < minCost)
+                        {
+                            minCost = cost;
+                            cheapestWorker = wkr;
+                        }
+                    }
+
+                    if (cheapestWorker != null)
+                    {
+                        Assignment inst;
+                        if (!workerAssignments.TryGetValue(cheapestWorker.GetID(), out inst))
+                        {
+                            int instId = workerAssignmentsCount.ContainsKey(cheapestWorker.GetID()) ? workerAssignmentsCount[cheapestWorker.GetID()] : 0;
+                            inst = new Assignment(instId, cheapestWorker);
+                            Assignments.Add(inst);
+                            workerAssignments[cheapestWorker.GetID()] = inst;
+                            workerAssignmentsCount[cheapestWorker.GetID()] = instId + 1;
+                        }
+                        inst.AddTask(i);
+                        taskAssignmentMap[i] = inst;
+                    }
+                    else
+                    {
+                        Console.Error.WriteLine($"No suitable worker found for task {i}.");
+                    }
                 }
-                if (totalCost < minTotalCost)
-                {
-                    minTotalCost = totalCost;
-                    cheapestHw = hw;
-                }
-            }
-
-            if (cheapestHw == null)
-            {
-                Console.Error.WriteLine("No suitable hardware found.");
-                return;
-            }
-
-            // Assign all tasks to the cheapest hardware
-            int estimatedCost = 0;
-            int estimatedTime = 0;
-            int numAllocated = 0;
-
-            // Create a single instance for the cheapest hardware
-            int instId = hwInstancesCount.ContainsKey(cheapestHw.GetID()) ? hwInstancesCount[cheapestHw.GetID()] : 0;
-            var inst = new Instance(instId, cheapestHw);
-            instances.Add(inst);
-            hwInstancesCount[cheapestHw.GetID()] = instId + 1;
-
-            for (int i = 0; i < taskGraph.GetVerticesSize(); i++)
-            {
-                var taskTimes = times.GetTimes(i, cheapestHw) ?? new List<int>();
-                var taskCosts = times.GetCosts(i, cheapestHw) ?? new List<int>();
-
-                if (taskTimes.Count > 1) // Subtasks
-                {
-                    estimatedTime += taskTimes.Max();
-                    estimatedCost += taskCosts.Sum();
-                }
-                else // Single task
-                {
-                    estimatedTime += taskTimes.FirstOrDefault();
-                    estimatedCost += taskCosts.FirstOrDefault();
-                }
-
-                inst.AddTask(i);
-                taskInstanceMap[i] = inst;
-                numAllocated++;
-            }
-
-            totalCost = estimatedCost;
-            Console.WriteLine($"Assigned {numAllocated} tasks to {cheapestHw}. Estimated time: {estimatedTime}, Estimated cost: {estimatedCost}");
-        }
-
-
-
-
-        private void CountTimer(ref bool stop, ref int time)
-        {
-            var start = Stopwatch.StartNew();
-            while (!stop)
-            {
-                time = (int)start.ElapsedMilliseconds;
-                Thread.Sleep(1);
             }
         }
 
-        public int GetInstanceStartingTime(Instance inst)
+        public int GetAssignmentStartingTime(Assignment inst)
         {
             int startingTime = 0;
             foreach (int i in inst.GetTaskSet())
@@ -728,7 +643,7 @@ namespace Tasks
             return startingTime;
         }
 
-        public int GetInstanceEndingTime(Instance inst)
+        public int GetAssignmentEndingTime(Assignment inst)
         {
             int endingTime = 0;
             foreach (int i in inst.GetTaskSet())
@@ -739,7 +654,7 @@ namespace Tasks
             return endingTime;
         }
 
-        public int GetTimeRunning(Instance inst)
+        public int GetTimeRunning(Assignment inst)
         {
             int totalTime = 0;
             foreach (int i in inst.GetTaskSet())
@@ -749,17 +664,17 @@ namespace Tasks
             return totalTime;
         }
 
-        public int GetIdleTime(Instance inst, int timeStop)
+        public int GetIdleTime(Assignment inst, int timeStop)
         {
             return timeStop - GetTimeRunning(inst);
         }
 
-        public Instance GetLongestRunningInstance()
+        public Assignment GetLongestRunningAssignment()
         {
             int longestRunning = int.MinValue;
-            Instance longest = null;
+            Assignment longest = null;
 
-            foreach (var inst in instances)
+            foreach (var inst in Assignments)
             {
                 int runningTime = GetTimeRunning(inst);
                 if (runningTime > longestRunning)
@@ -771,12 +686,12 @@ namespace Tasks
             return longest;
         }
 
-        public Instance GetShortestRunningInstance()
+        public Assignment GetShortestRunningAssignment()
         {
             int shortestRunning = int.MaxValue;
-            Instance shortest = null;
+            Assignment shortest = null;
 
-            foreach (var inst in instances)
+            foreach (var inst in Assignments)
             {
                 int runningTime = GetTimeRunning(inst);
                 if (runningTime < shortestRunning)
@@ -800,20 +715,18 @@ namespace Tasks
             return random.Next(max);
         }
 
-        public List<Hardware> GetHardwares() => hardwares;
-        public List<COM> GetCOMS() => channels;
+        public List<Worker> GetWorkers() => workers;
         public Graf GetGraph() => taskGraph;
 
         public void Clear()
         {
-            hardwares.Clear();
-            channels.Clear();
+            workers.Clear();
             times = new Times();
             taskGraph = new Graf();
-            hwInstancesCount.Clear();
-            instances.Clear();
-            taskInstanceMap.Clear();
-            hwToTasks.Clear();
+            workerAssignmentsCount.Clear();
+            Assignments.Clear();
+            taskAssignmentMap.Clear();
+            workerToTasks.Clear();
             taskSchedule.Clear();
         }
 
@@ -850,117 +763,71 @@ namespace Tasks
                 {
                     string line;
                     int section = -1;
-                    int tnum, weight, to, tasks;
-                    int hwCost, hwType;
+                    int tasksAmount = 0;
+                    int procCount = 0;
                     var timesMatrix = new List<List<string>>();
                     var costsMatrix = new List<List<string>>();
                     var loaded = new Graf();
-                    int hwIdCounter = 0;
 
                     while ((line = file.ReadLine()) != null)
                     {
                         lineNumber++;
                         line = line.Trim();
+                        if (string.IsNullOrWhiteSpace(line) || line.StartsWith("//")) continue;
 
-                        try
+                        if (line.StartsWith("@tasks"))
                         {
-                            if (line.StartsWith("@tasks")) section = 0;
-                            else if (line.StartsWith("@proc")) section = 1;
-                            else if (line.StartsWith("@times")) section = 2;
-                            else if (line.StartsWith("@cost")) section = 3;
-                            else if (line.StartsWith("@comm")) section = 4;
-                            else if (string.IsNullOrWhiteSpace(line)) continue;
-                            else
-                            {
-                                switch (section)
-                                {
-                                    case 0:
-                                        var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (parts.Length >= 2 && parts[0].StartsWith("T") && int.TryParse(parts[0][1..], out tnum))
-                                        {
-                                            if (!int.TryParse(parts[1], out tasks)) throw new Exception("Invalid task count.");
-                                            for (int i = 2; i < parts.Length; i++)
-                                            {
-                                                var token = parts[i];
-                                                if (token.Contains('(') && token.Contains(')'))
-                                                {
-                                                    var inner = token.Split('(');
-                                                    if (inner.Length != 2) throw new Exception($"Invalid edge format: {token}");
-                                                    to = int.Parse(inner[0]);
-                                                    weight = int.Parse(inner[1].TrimEnd(')'));
-                                                    if (weight == 0) weight = 1;
-                                                    loaded.AddEdge(tnum, to, weight);
-                                                    tasksAmount++;
-                                                }
-                                            }
-                                        }
-                                        break;
-
-                                    case 1:
-                                        var p = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (p.Length >= 3)
-                                        {
-                                            hwCost = int.Parse(p[0]);
-                                            hwType = int.Parse(p[1]);
-                                            int hwId = int.Parse(p[2]);
-                                            var hw = new Hardware(hwCost, (HardwareType)hwType, hwIdCounter++);
-                                            hardwares.Add(hw);
-                                        }
-                                        break;
-
-                                    case 2:
-                                        timesMatrix.Add(ParseMatrixLine(line));
-                                        break;
-
-                                    case 3:
-                                        costsMatrix.Add(ParseMatrixLine(line));
-                                        break;
-
-                                    case 4:
-                                        var ch = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-                                        if (ch.Length >= 3 && (ch[0].StartsWith("CHAN") || ch[0].StartsWith("CH0")))
-                                        {
-                                            string chanLabel = ch[0].Replace("CH0", "CHAN0");
-                                            int chanNum = int.Parse(chanLabel[4..]); // "CHAN" has 4 characters
-                                            int comCost = int.Parse(ch[1]);
-                                            int bandwidth = int.Parse(ch[2]);
-                                            var c = new COM(bandwidth, comCost, chanNum);
-
-                                            for (int i = 3; i < ch.Length; i++)
-                                            {
-                                                if (ch[i] == "1" && i - 3 < hardwares.Count)
-                                                    c.AddHardware(hardwares[i - 3]);
-                                            }
-
-                                            channels.Add(c);
-                                        }
-                                        break;
-
-
-                                    default:
-                                        throw new Exception("Unexpected section or malformed file.");
-                                }
-                            }
+                            section = 0;
+                            var match = Regex.Match(line, @"@tasks\s+(\d+)");
+                            if (match.Success)
+                                tasksAmount = int.Parse(match.Groups[1].Value);
+                            loaded = new Graf(tasksAmount, 0);
+                            continue;
                         }
-                        catch (Exception innerEx)
+                        if (line.StartsWith("@proc"))
                         {
-                            errorMessage = $"Błąd w linii {lineNumber}: \"{line}\"\nSzczegóły: {innerEx.Message}";
-                            return -1;
+                            section = 1;
+                            var match = Regex.Match(line, @"@proc\s+(\d+)");
+                            if (match.Success)
+                                procCount = int.Parse(match.Groups[1].Value);
+                            workers.Clear();
+                            for (int i = 0; i < procCount; i++)
+                                workers.Add(new Worker(i));
+                            continue;
+                        }
+                        if (line.StartsWith("@times")) { section = 2; continue; }
+                        if (line.StartsWith("@cost")) { section = 3; continue; }
+
+                        switch (section)
+                        {
+                            case 2:
+                                timesMatrix.Add(ParseMatrixLine(line));
+                                break;
+                            case 3:
+                                costsMatrix.Add(ParseMatrixLine(line));
+                                break;
+                                // Ignore anything else
                         }
                     }
 
-                    if (timesMatrix.Count != costsMatrix.Count)
+                    if (timesMatrix.Count != tasksAmount || costsMatrix.Count != tasksAmount)
                     {
-                        errorMessage = "Liczba wierszy w sekcji @times i @cost nie jest taka sama.";
+                        errorMessage = "Liczba wierszy w @times/@cost nie zgadza się z liczbą zadań.";
+                        return -1;
+                    }
+                    if (timesMatrix[0].Count != procCount || costsMatrix[0].Count != procCount)
+                    {
+                        errorMessage = "Liczba kolumn (wykonawców) nie zgadza się z liczbą w @proc.";
                         return -1;
                     }
 
-                    // ⬇️ Przekazanie danych do klasy Times
+                    times = new Times(tasksAmount);
+                    times.LoadWkr(workers);
                     times.SetTimesMatrix(timesMatrix);
                     times.SetCostsMatrix(costsMatrix);
 
                     taskGraph = loaded;
-                    tasksAmount--;
+                    this.tasksAmount = tasksAmount;
 
                     return 1;
                 }
@@ -977,71 +844,36 @@ namespace Tasks
 
         public void CreateRandomTasksGraph()
         {
-            if (tasksAmount <= 1)
-            {
-                Console.Error.WriteLine("Invalid number of tasks");
-                return;
-            }
 
-            var visited = new HashSet<int>();
-            var g = new Graf();
+            int minTasks = 3, maxTasks = 10;
+            int minWorkers = 2, maxWorkers = 5;
+            int minSubtasks = 2, maxSubtasks = 5;
+            int minTime = 5, maxTime = 40;
+            int minCost = 1, maxCost = 100;
 
-            if (withCost > 0)
-            {
-                g.AddEdge(0, 1, GetRand(SCALE));
-            }
-            else
-            {
-                g.AddEdge(0, 1);
-            }
+            var random = new Random();
 
-            visited.Add(0);
-            var visitedList = visited.ToList();
+            tasksAmount = random.Next(minTasks, maxTasks + 1);
+            jeepAmount = random.Next(minWorkers, maxWorkers + 1);
 
-            foreach (int i in visitedList)
-            {
-                for (int j = 0; j < tasksAmount; j++)
-                {
-                    if (RandomBool(tasksAmount / 6) && !visited.Contains(j))
-                    {
-                        if (withCost > 0)
-                        {
-                            g.AddEdge(i, j, GetRand(SCALE));
-                        }
-                        else
-                        {
-                            g.AddEdge(i, j);
-                        }
-                        visited.Add(j);
-                    }
-                }
-            }
+            workers = new List<Worker>();
+            for (int i = 0; i < jeepAmount; i++)
+                workers.Add(new Worker(i));
 
-            for (int i = 0; i < tasksAmount; i++)
-            {
-                if (!visited.Contains(i))
-                {
-                    int idx = random.Next(visited.Count);
-                    int randomVisitedTask = visited.ElementAt(idx);
+            taskGraph = new Graf(tasksAmount, maxSubtasks);
 
-                    if (!g.CheckEdge(randomVisitedTask, i))
-                    {
-                        if (withCost > 0)
-                        {
-                            g.AddEdge(randomVisitedTask, i, GetRand(SCALE));
-                        }
-                        else
-                        {
-                            g.AddEdge(randomVisitedTask, i);
-                        }
-                        visited.Add(i);
-                    }
-                }
-            }
+            times = new Times(tasksAmount);
+            times.LoadWkr(workers);
 
-            visited.Clear();
-            taskGraph = g;
+            times.SetRandomTimesAndCosts(
+                subtaskProbability: 100,
+                minSubtasks: minSubtasks,
+                maxSubtasks: maxSubtasks,
+                minValue: minTime,
+                maxValue: maxTime
+            );
         }
+
 
         public void PrintTasks(TextWriter writer = null)
         {
@@ -1065,38 +897,22 @@ namespace Tasks
             }
         }
 
-        public void PrintCOMS(TextWriter writer = null)
-        {
-            var output = writer ?? Console.Out;
-            output.WriteLine($"@comm {channels.Count}");
-
-            foreach (var c in channels)
-            {
-                c.PrintCOM(hardwares.Count, output);
-            }
-        }
-
         public void PrintProc(TextWriter writer = null)
         {
             var output = writer ?? Console.Out;
-            output.WriteLine($"@proc {hardwares.Count}");
-
-            foreach (var h in hardwares)
-            {
-                h.PrintHW(output);
-                output.WriteLine();
-            }
+            output.WriteLine($"@proc {workers.Count}");
         }
 
-        public void PrintInstances()
+
+        public void PrintAssignments()
         {
-            instances.Sort();
-            Console.WriteLine($"Created {instances.Count} components");
+            Assignments.Sort();
+            Console.WriteLine($"Created {Assignments.Count} components");
 
             int criticalTime = 0;
-            if (taskInstanceMap != null)
+            if (taskAssignmentMap != null)
             {
-                foreach (var pair in taskInstanceMap)
+                foreach (var pair in taskAssignmentMap)
                 {
                     int taskId = pair.Key;
                     int endingTime = GetEndingTime(taskId);
@@ -1107,7 +923,7 @@ namespace Tasks
                 }
             }
 
-            foreach (var inst in instances ?? Enumerable.Empty<Instance>())
+            foreach (var inst in Assignments ?? Enumerable.Empty<Assignment>())
             {
                 int expTime = 0;
                 int expCost = 0;
@@ -1115,8 +931,8 @@ namespace Tasks
 
                 foreach (int taskID in taskIds)
                 {
-                    var taskTimes = this.times.GetTimes(taskID, inst.GetHardwarePtr()) ?? new List<int>();
-                    var taskCosts = this.times.GetCosts(taskID, inst.GetHardwarePtr()) ?? new List<int>();
+                    var taskTimes = this.times.GetTimes(taskID, inst.GetWorkerPtr()) ?? new List<int>();
+                    var taskCosts = this.times.GetCosts(taskID, inst.GetWorkerPtr()) ?? new List<int>();
 
                     if (taskTimes.Count > 1) // Subtasks: use max time, sum costs
                     {
@@ -1130,12 +946,12 @@ namespace Tasks
                     }
                 }
 
-                expCost += inst.GetHardwarePtr()?.GetCost() ?? 0;
-                Console.WriteLine($"{inst} Tasks: {taskIds.Count} Expected time: {expTime} Idle time: {GetIdleTime(inst, criticalTime)} Cost: {expCost} Including initial: {inst.GetHardwarePtr()?.GetCost() ?? 0}");
+                expCost += inst.GetWorkerPtr()?.GetCost() ?? 0;
+                Console.WriteLine($"{inst} Tasks: {taskIds.Count} Expected time: {expTime} Idle time: {GetIdleTime(inst, criticalTime)} Cost: {expCost} Including initial: {inst.GetWorkerPtr()?.GetCost() ?? 0}");
                 foreach (int taskID in taskIds)
                 {
-                    var taskTimes = this.times.GetTimes(taskID, inst.GetHardwarePtr()) ?? new List<int>();
-                    var taskCosts = this.times.GetCosts(taskID, inst.GetHardwarePtr()) ?? new List<int>();
+                    var taskTimes = this.times.GetTimes(taskID, inst.GetWorkerPtr()) ?? new List<int>();
+                    var taskCosts = this.times.GetCosts(taskID, inst.GetWorkerPtr()) ?? new List<int>();
 
                     if (taskTimes.Count > 1)
                     {
@@ -1153,24 +969,15 @@ namespace Tasks
             {
                 foreach (var pair in taskSchedule)
                 {
-                    var instance = GetInstance(pair.Key);
-                    // Use ternary operator to handle null instance
-                    Console.WriteLine($"T{pair.Key}\ton {(instance != null ? instance.ToString() : "None")} from: {pair.Value.Item1} to: {pair.Value.Item2}");
+                    var assignment = GetAssignment(pair.Key);
+                    // Use ternary operator to handle null assignment
+                    Console.WriteLine($"T{pair.Key}\ton {(assignment != null ? assignment.ToString() : "None")} from: {pair.Value.Item1} to: {pair.Value.Item2}");
                 }
             }
 
             Console.WriteLine($"Critical path time: {criticalTime}");
         }
 
-        public void RandALL()
-        {
-            times = new Times(tasksAmount); // Initialize the field
-            CreateRandomTasksGraph();
-            GetRandomProc(hardwareCoresAmount, processingUnitAmount);
-            times.LoadHW(hardwares);
-            times.SetRandomTimesAndCosts();
-            ConnectRandomCH(channelsAmount);
-        }
 
         public void PrintALL(string filename, bool toScreen = false)
         {
@@ -1190,9 +997,6 @@ namespace Tasks
                     if (toScreen) times.Show();
                     times.Show(outputFile);
 
-                    // @coms
-                    PrintCOMS(outputFile);
-                    if (toScreen) PrintCOMS();
                 }
 
                 Console.WriteLine($"Saved list to file {filename}");
@@ -1205,334 +1009,66 @@ namespace Tasks
 
         public int GetRandomProc()
         {
-            hardwares.Clear();
 
-            if (hardwareCoresAmount < 1 || processingUnitAmount < 1)
+            for (int i = 0; i < jeepAmount; i++)
             {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hardwareCoresAmount; i++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
-            }
-
-            int hcSize = hardwareCoresAmount;
-            for (int j = 0; j < processingUnitAmount; j++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
+                workers.Add(new Worker(workers.Count));
             }
 
             return 1;
         }
 
-        public int GetRandomProc(int hcs, int pes)
-        {
-            hardwares.Clear();
-
-            if (hcs < 1 || pes < 1)
-            {
-                Console.Error.WriteLine("Invalid number of HC or PU");
-                return -1;
-            }
-
-            for (int i = 0; i < hcs; i++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.HC, hardwares.Count));
-            }
-
-            int hcSize = hcs;
-            for (int j = 0; j < pes; j++)
-            {
-                hardwares.Add(new Hardware(GetRand(5) + 1, HardwareType.PE, hardwares.Count - hcSize));
-            }
-
-            return 1;
-        }
-
-        public void ConnectRandomCH()
-        {
-            if (channelsAmount < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            for (int i = 0; i < channelsAmount; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                int rd;
-
-                var com = new COM(bd, conCost, channels.Count);
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
-
-        public void ConnectRandomCH(int coms)
-        {
-            if (coms < 1)
-            {
-                Console.Error.WriteLine("Invalid number of channels");
-                return;
-            }
-
-            channels.Clear(); // Clear existing channels
-
-            for (int i = 0; i < coms; i++)
-            {
-                int bd = ((GetRand(9) + 1) * 10);
-                int conCost = (GetRand(9) + 1) * 5;
-                var com = new COM(bd, conCost, i); // Use i as channel ID
-
-                foreach (var h in hardwares)
-                {
-                    if (RandomBool(i + 1))
-                    {
-                        com.AddHardware(h);
-                    }
-                }
-
-                while (com.GetSize() < 3)
-                {
-                    int rd = GetRand(hardwares.Count);
-                    com.AddHardware(hardwares[rd]);
-                }
-
-                channels.Add(com);
-            }
-
-            foreach (var h in hardwares)
-            {
-                bool allConnected = false;
-
-                foreach (var c in channels)
-                {
-                    if (c.IsConnected(h))
-                    {
-                        allConnected = true;
-                        break;
-                    }
-                }
-
-                if (!allConnected)
-                {
-                    channels[0].AddHardware(h);
-                }
-            }
-        }
 
 
-
-        public void RunTasks()
-        {
-            int totalCost = 0;
-            simulationTimeScale = 1;
-
-            Console.WriteLine($"\nRunning tasks in scale x{simulationTimeScale}:");
-
-            progress = Enumerable.Repeat(-2, taskGraph.GetVerticesSize()).ToList(); // -2 - can't be done flag
-            progress[0] = -1;
-
-            var tasks = new List<Task>();
-            int numThreads = instances.Count;
-            bool stop = false;
-            int time = 0;
-
-            var counterTask = Task.Run(() => CountTimer(ref stop, ref time));
-
-            foreach (var inst in instances)
-            {
-                var instanceCopy = inst;
-                tasks.Add(Task.Run(() => TaskRunner(instanceCopy)));
-            }
-
-            Task.WaitAll(tasks.ToArray());
-            stop = true;
-            counterTask.Wait();
-
-            Console.WriteLine($"\n\nProgram execution time: {time} milliseconds. (scale x{simulationTimeScale})\n\n");
-        }
-
-        public Hardware GetLowestTimeHardware(int taskId, int timeCost)
+        public Worker GetLowestTimeWorker(int taskId, int timeCost) 
         {
             int minValue = INF;
-            Hardware minHardware = null;
+            Worker minWorker = null;
 
-            foreach (var hw in hardwares)
+            foreach (var wkr in workers)
             {
-                var values = (timeCost == 0) ? times.GetTimes(taskId, hw) : times.GetCosts(taskId, hw);
+                var values = (timeCost == 0) ? times.GetTimes(taskId, wkr) : times.GetCosts(taskId, wkr);
                 // For subtasks, use max time (parallel execution) or sum of costs
                 int value = values.Count > 1 ? (timeCost == 0 ? values.Max() : values.Sum()) : values.FirstOrDefault();
                 if (value < minValue)
                 {
                     minValue = value;
-                    minHardware = hw;
+                    minWorker = wkr;
                 }
             }
 
-            return minHardware;
+            return minWorker;
         }
 
-        public void createInstance(int taskId, Hardware hw)
+        public void createAssignment(int taskId, Worker worker)
         {
-            int instId = hwInstancesCount.ContainsKey(hw.GetID()) ? hwInstancesCount[hw.GetID()] : 0;
-            var inst = new Instance(instId, hw);
+            int instId = workerAssignmentsCount.ContainsKey(worker.GetID()) ? workerAssignmentsCount[worker.GetID()] : 0;
+            var inst = new Assignment(instId, worker);
             inst.AddTask(taskId);
-            instances.Add(inst);
-            taskInstanceMap[taskId] = inst;
-            hwInstancesCount[hw.GetID()] = instId + 1;
+            Assignments.Add(inst);
+            taskAssignmentMap[taskId] = inst;
+            workerAssignmentsCount[worker.GetID()] = instId + 1;
         }
 
-        public void addTaskToInstance(int taskId, Instance inst)
+        public void addTaskToAssignment(int taskId, Assignment inst)
         {
             inst.AddTask(taskId);
-            taskInstanceMap[taskId] = inst;
+            taskAssignmentMap[taskId] = inst;
         }
 
-        public void removeTaskFromInstance(int taskId)
+        public void removeTaskFromAssignment(int taskId)
         {
-            Instance oldInst = taskInstanceMap[taskId];
+            Assignment oldInst = taskAssignmentMap[taskId];
             oldInst.RemoveTask(taskId);
             if(oldInst.GetTaskSet().Count == 0)
             {
-                instances.Remove(oldInst);
+                Assignments.Remove(oldInst);
             }
             else
             {
-                taskInstanceMap[taskId] = oldInst;
+                taskAssignmentMap[taskId] = oldInst;
             }
-            taskInstanceMap.Remove(taskId);
-        }
-
-        public void TaskRunner(Instance inst)
-        {
-            if (inst == null || inst.GetHardwarePtr() == null)
-            {
-                Console.Error.WriteLine("Invalid instance or hardware.");
-                return;
-            }
-
-            while (true)
-            {
-                int taskId = -1;
-                lock (progress)
-                {
-                    taskId = GetNextTask();
-                    if (taskId == -1) // No more tasks to process
-                        break;
-
-                    if (progress[taskId] == -1) // Task is ready to start
-                    {
-                        progress[taskId] = 0; // Mark as in progress
-                    }
-                    else
-                    {
-                        continue; // Task is not ready or already processed
-                    }
-                }
-
-                // Get times and costs for the task using the CostList.times field
-                var taskTimes = times.GetTimes(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                var taskCosts = times.GetCosts(taskId, inst.GetHardwarePtr()) ?? new List<int>();
-                int maxTime = 0;
-                int startTime = GetInstanceStartingTime(inst);
-
-                try
-                {
-                    if (taskTimes.Count > 1) // Handle subtasks (parallel execution)
-                    {
-                        var subtaskEndTimes = new List<int>();
-                        var subtaskTasks = new List<Task>();
-
-                        for (int s = 0; s < taskTimes.Count; s++)
-                        {
-                            int subtaskIndex = s;
-                            int subtaskTime = taskTimes[subtaskIndex];
-                            if (subtaskTime < 0)
-                            {
-                                Console.Error.WriteLine($"Invalid subtask time for task {taskId}, subtask {subtaskIndex}.");
-                                continue;
-                            }
-
-                            var subtask = Task.Run(() =>
-                            {
-                                Thread.Sleep(subtaskTime * simulationTimeScale);
-                                lock (subtaskEndTimes)
-                                {
-                                    subtaskEndTimes.Add(startTime + subtaskTime);
-                                }
-                            });
-                            subtaskTasks.Add(subtask);
-                        }
-
-                        // Wait for all subtasks to complete
-                        Task.WhenAll(subtaskTasks).Wait();
-
-                        maxTime = subtaskEndTimes.Any() ? subtaskEndTimes.Max() : startTime;
-                    }
-                    else // Handle single task
-                    {
-                        int timeCost = taskTimes.Count > 0 ? taskTimes[0] : 0;
-                        if (timeCost < 0)
-                        {
-                            Console.Error.WriteLine($"Invalid time for task {taskId}.");
-                            timeCost = 0;
-                        }
-                        Thread.Sleep(timeCost * simulationTimeScale);
-                        maxTime = startTime + timeCost;
-                    }
-
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark task as completed
-                        taskSchedule[taskId] = new Tuple<int, int>(startTime, maxTime);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Console.Error.WriteLine($"Error processing task {taskId}: {ex.Message}");
-                    lock (progress)
-                    {
-                        progress[taskId] = -2; // Mark as completed to avoid stalling
-                    }
-                }
-            }
+            taskAssignmentMap.Remove(taskId);
         }
 
         void PrintSchedule()
@@ -1562,32 +1098,20 @@ namespace Tasks
             return 0;
         }
 
-        public int GetNextTask()
+        public Assignment GetAssignment(int taskId)
         {
-            for (int i = 0; i < progress.Count; i++)
+            if (taskAssignmentMap.ContainsKey(taskId))
             {
-                if (progress[i] == -1)
-                {
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        public Instance GetInstance(int taskId)
-        {
-            if (taskInstanceMap.ContainsKey(taskId))
-            {
-                return taskInstanceMap[taskId];
+                return taskAssignmentMap[taskId];
             }
             return null;
         }
 
-        public void taskDistribution(int rule)
+        public void taskDistribution(int rule) // narazie lepiej zostawić
         {
-            if (taskGraph == null || hardwares == null || hardwares.Count == 0)
+            if (taskGraph == null || workers == null || workers.Count == 0)
             {
-                Console.Error.WriteLine("Invalid task graph or hardware list.");
+                Console.Error.WriteLine("Invalid task graph or worker list.");
                 return;
             }
 
@@ -1601,44 +1125,44 @@ namespace Tasks
             for (int i = 0; i < taskAmount; i++)
             {
                 // Use this.times to explicitly access the CostList.times field
-                var taskTimesList = this.times.GetTimes(i, hardwares[0]) ?? new List<int>();
+                var taskTimesList = this.times.GetTimes(i, workers[0]) ?? new List<int>();
 
-                if (taskTimesList.Count > 1) // Subtasks: allocate each subtask to best hardware
+                if (taskTimesList.Count > 1) // Subtasks: allocate each subtask to best worker
                 {
                     for (int s = 0; s < taskTimesList.Count; s++)
                     {
-                        Hardware bestHw = null;
+                        Worker bestWkr = null;
                         int minValue = INF;
 
-                        foreach (var hw in hardwares)
+                        foreach (var wkr in workers)
                         {
-                            var hwTimes = this.times.GetTimes(i, hw) ?? new List<int>();
-                            var hwCosts = this.times.GetCosts(i, hw) ?? new List<int>();
+                            var wkrTimes = this.times.GetTimes(i, wkr) ?? new List<int>();
+                            var wkrCosts = this.times.GetCosts(i, wkr) ?? new List<int>();
 
-                            if (s >= hwTimes.Count || s >= hwCosts.Count)
+                            if (s >= wkrTimes.Count || s >= wkrCosts.Count)
                                 continue;
 
-                            int value = (rule == 0) ? hwTimes[s] : hwCosts[s];
+                            int value = (rule == 0) ? wkrTimes[s] : wkrCosts[s];
                             if (value < minValue)
                             {
                                 minValue = value;
-                                bestHw = hw;
+                                bestWkr = wkr;
                             }
                         }
 
-                        if (bestHw != null)
+                        if (bestWkr != null)
                         {
-                            var bestHwCosts = this.times.GetCosts(i, bestHw) ?? new List<int>();
-                            var bestHwTimes = this.times.GetTimes(i, bestHw) ?? new List<int>();
+                            var bestWkreCosts = this.times.GetCosts(i, bestWkr) ?? new List<int>();
+                            var bestWkrTimes = this.times.GetTimes(i, bestWkr) ?? new List<int>();
 
-                            if (s < bestHwCosts.Count && s < bestHwTimes.Count)
+                            if (s < bestWkreCosts.Count && s < bestWkrTimes.Count)
                             {
-                                estimatedCost += bestHwCosts[s];
-                                estimatedTime += bestHwTimes[s];
-                                totalCost += bestHwCosts[s];
+                                estimatedCost += bestWkreCosts[s];
+                                estimatedTime += bestWkrTimes[s];
+                                totalCost += bestWkreCosts[s];
 
-                                createInstance(i, bestHw);
-                                addTaskToInstance(i, instances[instances.Count - 1]);
+                                createAssignment(i, bestWkr);
+                                addTaskToAssignment(i, Assignments[Assignments.Count - 1]);
                                 if (allocatedTasks[i] == 0) // Count task only once
                                 {
                                     allocatedTasks[i] = 1; // Mark task as allocated
@@ -1648,29 +1172,29 @@ namespace Tasks
                         }
                         else
                         {
-                            Console.Error.WriteLine($"No suitable hardware found for task {i}, subtask {s}.");
+                            Console.Error.WriteLine($"No suitable worker found for task {i}, subtask {s}.");
                         }
                     }
                 }
-                else // Single task: allocate to best hardware
+                else // Single task: allocate to best worker
                 {
-                    var hw = GetLowestTimeHardware(i, rule);
-                    if (hw != null)
+                    var wkr = GetLowestTimeWorker(i, rule);
+                    if (wkr != null)
                     {
-                        var taskCosts = this.times.GetCosts(i, hw) ?? new List<int>();
-                        var taskTimes = this.times.GetTimes(i, hw) ?? new List<int>();
+                        var taskCosts = this.times.GetCosts(i, wkr) ?? new List<int>();
+                        var taskTimes = this.times.GetTimes(i, wkr) ?? new List<int>();
 
                         estimatedCost += taskCosts.Count > 0 ? taskCosts[0] : 0;
                         estimatedTime += taskTimes.Count > 0 ? taskTimes[0] : 0;
                         totalCost += taskCosts.Count > 0 ? taskCosts[0] : 0;
 
-                        createInstance(i, hw);
+                        createAssignment(i, wkr);
                         allocatedTasks[i] = 1; // Mark task as allocated
                         numAllocated++;
                     }
                     else
                     {
-                        Console.Error.WriteLine($"No suitable hardware found for task {i}.");
+                        Console.Error.WriteLine($"No suitable worker found for task {i}.");
                     }
                 }
             }

@@ -12,14 +12,14 @@ namespace TaskGraphWPF
     public partial class TaskAssignmentWindow : Window
     {
         private readonly CostList costList;
-        private Dictionary<Hardware, Point> hardwarePositions;
+        private Dictionary<Worker, Point> workerPositions;
         private Dictionary<string, Point> taskPositions;
 
         public TaskAssignmentWindow(CostList costList)
         {
             InitializeComponent();
             this.costList = costList ?? throw new ArgumentNullException(nameof(costList));
-            hardwarePositions = new Dictionary<Hardware, Point>();
+            workerPositions = new Dictionary<Worker, Point>();
             taskPositions = new Dictionary<string, Point>();
             Loaded += TaskAssignmentWindow_Loaded;
             Console.WriteLine("TaskAssignmentWindow initialized.");
@@ -36,72 +36,72 @@ namespace TaskGraphWPF
         {
             Console.WriteLine("Starting DrawAssignmentGraph...");
             AssignmentCanvas.Children.Clear();
-            var hardwares = costList.GetHardwares();
-            var instances = costList.GetInstances();
-            if (hardwares == null || !hardwares.Any() || instances == null || !instances.Any())
+            var workers = costList.GetWorkers();
+            var instances = costList.GetAssignments();
+            if (workers == null || !workers.Any() || instances == null || !instances.Any())
             {
-                Console.WriteLine("No hardwares or instances available.");
+                Console.WriteLine("No workers or Assignments available.");
                 MessageBox.Show("No assignments to display.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
             double canvasWidth = AssignmentCanvas.ActualWidth > 0 ? AssignmentCanvas.ActualWidth : 800;
             double canvasHeight = AssignmentCanvas.ActualHeight > 0 ? AssignmentCanvas.ActualHeight : 600;
-            double hwSpacing = canvasWidth / (hardwares.Count + 1);
+            double wkrSpacing = canvasWidth / (workers.Count + 1);
             double taskSpacing = 60;
-            double hwY = 50;
+            double wkrY = 50;
             double nodeSize = 40;
 
-            Console.WriteLine($"Drawing {hardwares.Count} hardware nodes...");
-            int hwIndex = 0;
-            foreach (var hw in hardwares.OrderBy(h => h.GetType()).ThenBy(h => h.GetID()))
+            Console.WriteLine($"Drawing {workers.Count} worker nodes...");
+            int wkrIndex = 0;
+            foreach (var wkr in workers.OrderBy(h => h.GetType()).ThenBy(h => h.GetID()))
             {
-                double x = (hwIndex + 1) * hwSpacing;
-                hardwarePositions[hw] = new Point(x, hwY);
+                double x = (wkrIndex + 1) * wkrSpacing;
+                workerPositions[wkr] = new Point(x, wkrY);
 
                 var node = new Rectangle
                 {
                     Width = nodeSize,
                     Height = nodeSize,
-                    Fill = hw.GetType() == HardwareType.HC ? Brushes.Green : Brushes.Orange,
+                    Fill = Brushes.Green ,
                     Stroke = Brushes.Black,
-                    ToolTip = $"{hw} (Cost: {hw.GetCost()})"
+                    ToolTip = $"{wkr} (Cost: {wkr.GetCost()})"
                 };
                 Canvas.SetLeft(node, x - nodeSize / 2);
-                Canvas.SetTop(node, hwY - nodeSize / 2);
+                Canvas.SetTop(node, wkrY - nodeSize / 2);
                 AssignmentCanvas.Children.Add(node);
 
                 var label = new TextBlock
                 {
-                    Text = hw.ToString(),
+                    Text = wkr.ToString(),
                     Foreground = Brushes.White,
                     ToolTip = node.ToolTip
                 };
                 Canvas.SetLeft(label, x - 15);
-                Canvas.SetTop(label, hwY - 10);
+                Canvas.SetTop(label, wkrY - 10);
                 AssignmentCanvas.Children.Add(label);
 
-                hwIndex++;
+                wkrIndex++;
             }
 
-            Console.WriteLine($"Drawing tasks for {instances.Count} instances...");
-            foreach (var instance in instances.OrderBy(i => i.GetHardwarePtr().GetType()).ThenBy(i => i.GetHardwarePtr().GetID()))
+            Console.WriteLine($"Drawing tasks for {instances.Count} Assignments...");
+            foreach (var instance in instances.OrderBy(i => i.GetWorkerPtr().GetType()).ThenBy(i => i.GetWorkerPtr().GetID()))
             {
-                var hw = instance.GetHardwarePtr();
-                if (!hardwarePositions.ContainsKey(hw))
+                var wkr = instance.GetWorkerPtr();
+                if (!workerPositions.ContainsKey(wkr))
                 {
-                    Console.WriteLine($"Hardware {hw} not found in positions.");
+                    Console.WriteLine($"Worker {wkr} not found in positions.");
                     continue;
                 }
 
                 var tasks = instance.GetTaskSet().ToList();
-                double hwX = hardwarePositions[hw].X;
-                double currentY = hwY + nodeSize + 50;
+                double wkrX = workerPositions[wkr].X;
+                double currentY = wkrY + nodeSize + 50;
 
                 foreach (int taskId in tasks)
                 {
-                    var times = costList.GetTimes().GetTimes(taskId, hw) ?? new List<int>();
-                    var costs = costList.GetTimes().GetCosts(taskId, hw) ?? new List<int>();
+                    var times = costList.GetTimes().GetTimes(taskId, wkr) ?? new List<int>();
+                    var costs = costList.GetTimes().GetCosts(taskId, wkr) ?? new List<int>();
                     bool hasSubtasks = times.Count > 1;
 
                     if (hasSubtasks)
@@ -111,7 +111,7 @@ namespace TaskGraphWPF
                         {
                             string subtaskLabel = $"T{taskId}_{subtaskIndex}";
                             double taskY = currentY;
-                            taskPositions[subtaskLabel] = new Point(hwX, taskY);
+                            taskPositions[subtaskLabel] = new Point(wkrX, taskY);
 
                             string tooltip = $"Subtask {subtaskLabel} (Time: {times[subtaskIndex]}, Cost: {costs[subtaskIndex]})";
 
@@ -123,7 +123,7 @@ namespace TaskGraphWPF
                                 Stroke = Brushes.Black,
                                 ToolTip = tooltip
                             };
-                            Canvas.SetLeft(node, hwX - nodeSize / 2);
+                            Canvas.SetLeft(node, wkrX - nodeSize / 2);
                             Canvas.SetTop(node, taskY - nodeSize / 2);
                             AssignmentCanvas.Children.Add(node);
 
@@ -133,15 +133,15 @@ namespace TaskGraphWPF
                                 Foreground = Brushes.White,
                                 ToolTip = tooltip
                             };
-                            Canvas.SetLeft(label, hwX - 20);
+                            Canvas.SetLeft(label, wkrX - 20);
                             Canvas.SetTop(label, taskY - 10);
                             AssignmentCanvas.Children.Add(label);
 
                             var line = new Line
                             {
-                                X1 = hwX,
-                                Y1 = hwY + nodeSize / 2,
-                                X2 = hwX,
+                                X1 = wkrX,
+                                Y1 = wkrY + nodeSize / 2,
+                                X2 = wkrX,
                                 Y2 = taskY - nodeSize / 2,
                                 Stroke = Brushes.Black,
                                 StrokeThickness = 2
@@ -156,7 +156,7 @@ namespace TaskGraphWPF
                         // Draw a single task node
                         string taskLabel = $"T{taskId}";
                         double taskY = currentY;
-                        taskPositions[taskLabel] = new Point(hwX, taskY);
+                        taskPositions[taskLabel] = new Point(wkrX, taskY);
 
                         string tooltip = $"Task {taskLabel} (Time: {times.FirstOrDefault()}, Cost: {costs.FirstOrDefault()})";
 
@@ -168,7 +168,7 @@ namespace TaskGraphWPF
                             Stroke = Brushes.Black,
                             ToolTip = tooltip
                         };
-                        Canvas.SetLeft(node, hwX - nodeSize / 2);
+                        Canvas.SetLeft(node, wkrX - nodeSize / 2);
                         Canvas.SetTop(node, taskY - nodeSize / 2);
                         AssignmentCanvas.Children.Add(node);
 
@@ -178,15 +178,15 @@ namespace TaskGraphWPF
                             Foreground = Brushes.White,
                             ToolTip = tooltip
                         };
-                        Canvas.SetLeft(label, hwX - 15);
+                        Canvas.SetLeft(label, wkrX - 15);
                         Canvas.SetTop(label, taskY - 10);
                         AssignmentCanvas.Children.Add(label);
 
                         var line = new Line
                         {
-                            X1 = hwX,
-                            Y1 = hwY + nodeSize / 2,
-                            X2 = hwX,
+                            X1 = wkrX,
+                            Y1 = wkrY + nodeSize / 2,
+                            X2 = wkrX,
                             Y2 = taskY - nodeSize / 2,
                             Stroke = Brushes.Black,
                             StrokeThickness = 2
