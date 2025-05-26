@@ -879,22 +879,6 @@ namespace Tasks
         {
             var output = writer ?? Console.Out;
             output.WriteLine($"@tasks {tasksAmount}");
-
-            var outIdx = new List<int>();
-            var size = tasksAmount;
-
-            for (int i = 0; i < size; i++)
-            {
-                outIdx = taskGraph.GetOutNeighbourIndices(i);
-                output.Write($"T{i} ");
-                output.Write($"{outIdx.Count} ");
-
-                foreach (int j in outIdx)
-                {
-                    output.Write($"{j}({taskGraph.GetWeightEdge(i, j)}) ");
-                }
-                output.WriteLine();
-            }
         }
 
         public void PrintProc(TextWriter writer = null)
